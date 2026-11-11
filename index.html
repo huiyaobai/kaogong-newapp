@@ -148,6 +148,12 @@ label.fl{display:block;font-size:13px;font-weight:800;margin:10px 0 2px;color:va
 .synw b{font-size:15px}
 .gtab{display:flex;gap:8px;margin:4px 0 10px}
 .resume{background:#fdf6e8;border:1px solid #ecd9ac;border-radius:14px;padding:12px 14px;margin:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13.5px;font-weight:700}
+.cmptable{border-collapse:collapse;width:100%;font-size:13px;min-width:340px}
+.cmptable th,.cmptable td{border:1px solid var(--line);padding:8px 9px;text-align:left;vertical-align:top;line-height:1.55}
+.cmptable th{background:var(--mint);font-size:13px}
+.cmptable th a{color:var(--ink);text-decoration:none;font-weight:900}
+.cmptable tr.diff td{background:#fdf0ec}
+.cmptable tr.diff td:first-child{background:#fdecea}
 </style>
 </head>
 <body>
@@ -173,6 +179,7 @@ label.fl{display:block;font-size:13px;font-weight:800;margin:10px 0 2px;color:va
  <button data-v="mock" onclick="go('mock')"><span class="ic">⏱️</span>模考</button>
  <button data-v="mine" onclick="go('mine')"><span class="ic">👤</span>我的</button>
 </nav>
+<button id="cmpFloat" onclick="compareOpen()" style="display:none;position:fixed;right:14px;bottom:92px;z-index:30;align-items:center;gap:6px;background:var(--jade);color:#fff;border:0;border-radius:999px;padding:10px 14px;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 6px 16px rgba(224,69,47,.35);font-family:inherit">⚖️ 对比篮 <b>0</b></button>
 </div>
 <div id="ovl">
  <div class="ovlhead"><button class="backbtn" onclick="ovlBack()">‹ 返回</button><span class="t" id="ovlTitle"></span><span style="min-width:52px"></span></div>
@@ -204,7 +211,7 @@ var PROV_SEED=['北京','天津','河北','山西','内蒙古','辽宁','吉林'
 var SUB_REGIONS=['国考','江苏','浙江','天津','广东','上海','山东','重庆'];
 
 /* ---- 1. 本机存储 ---- */
-var LSK={app:'sy_app',profile:'sy_profile',favpos:'sy_fav_pos',subs:'sy_subs',meta:'sy_ota_meta'};
+var LSK={app:'sy_app',profile:'sy_profile',favpos:'sy_fav_pos',subs:'sy_subs',meta:'sy_ota_meta',compare:'sy_compare'};
 function lsGet(k,d){try{var v=JSON.parse(localStorage.getItem(k));return v==null?d:v}catch(e){return d}}
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 var ST=lsGet(LSK.app,{});
@@ -219,6 +226,8 @@ var OTAMETA=lsGet(LSK.meta,null);
 function saveST(){lsSet(LSK.app,ST)}
 function saveProfile(){lsSet(LSK.profile,PROFILE)}
 function saveFavPos(){lsSet(LSK.favpos,FAVPOS)}
+var COMPARE=lsGet(LSK.compare,[]);
+function saveCompare(){lsSet(LSK.compare,COMPARE)}
 function saveSubs(){lsSet(LSK.subs,SUBS)}
 
 /* ---- 2. 工具 ---- */
@@ -372,8 +381,8 @@ function vChoose(){var el=document.getElementById('v-choose');
  +'<p class="meta" id="posMeta" style="margin-top:8px">检索需要联网；无网时题库刷题不受影响。</p>'
  +'<div id="posList"></div><div id="posPager" class="pager"></div></div>'
  +'<div class="card"><b>⭐ 收藏的职位</b><span class="meta" id="fpCount" style="margin-left:6px"></span><div id="fpList" style="margin-top:4px"></div></div>'
- +'<div class="card note"><p class="meta">· 详情页不展示薪资：暂无官方数据来源，不编造。<br>· 实时报名人数官方不逐岗公布，只提供基于历年进面分的静态热度估算。<br>· 进面分来自国家公务员局历年面试名单，仅供参考。</p></div>';
- renderFavPos();if(POS.res)renderPosResult()}
+ +'<div class="card note"><p class="meta">· 详情页不展示薪资：暂无官方数据来源，不编造。<br>· 实时报名人数官方不逐岗公布，只提供基于历年进面分的静态热度估算。<br>· 进面分来自国家公务员局历年面试名单，仅供参考。<br>· 新功能：职位解读卡、自动标签、对比篮（最多 4 个）、分享文本卡——都在职位详情里。</p></div>';
+ renderFavPos();renderCompareBtn();if(POS.res)renderPosResult()}
 function posSaveProfile(silent){PROFILE={major:($('#posMajor')||{}).value||PROFILE.major,edu:($('#posEdu')||{}).value||PROFILE.edu,
  politics:($('#posPol')||{}).value||PROFILE.politics,base:($('#posBase')||{}).value||PROFILE.base,
  province:($('#posProv')||{}).value||PROFILE.province,kw:($('#posKw')||{}).value||PROFILE.kw};
@@ -393,14 +402,44 @@ function posSearch(page){if(page)POS.page=page;POS.params=posReadParams();
  .catch(function(e){$('#posMeta').textContent='检索失败：'+(e&&e.message?e.message:'网络不可用')+'。可稍后重试；题库刷题不受影响。'})}
 function bandChip(hist){if(!hist||hist.min==null)return '<span class="tag grey">近3年进面分：暂缺</span>';
  return '<span class="tag jade">近3年进面 '+hist.min.toFixed(1)+'–'+hist.max.toFixed(1)+'</span>'}
-function heatChip(d,hist){if(!hist||hist.min==null)return '';
- var maxAll=hist.max!=null?hist.max:0;var cnt=d.count||0;var rest=0;
+var TAGRULES=[
+ {name:'加班多',re:/加班|值班|节假日|任务重|强度大/,desc:'备注提到加班、值班或工作强度大'},
+ {name:'常出差',re:/出差|外勤|驻外/,desc:'备注提到出差、外勤或驻外'},
+ {name:'体能测试',re:/体能测评|体能测试|体能/,desc:'需按人民警察要求做体能测评'},
+ {name:'证书要求',re:/四六级|法考|法律职业资格|执业资格|证书/,desc:'备注提到证书要求'},
+ {name:'户籍要求',re:/户籍|生源地/,desc:'备注提到户籍或生源要求'},
+ {name:'服务年限',re:/服务年限|最低服务/,desc:'备注提到最低服务年限'},
+ {name:'性别要求',re:/限男性|限女性/,desc:'备注限定了性别'},
+ {name:'应届要求',re:/限\d+届毕业生|应届毕业生/,desc:'备注限定应届毕业生'},
+ {name:'夜班',re:/夜班/,desc:'备注提到夜班'}];
+function extractTags(d){var txt=((d.intro||'')+'\n'+(d.note||''));
+ var out=[];TAGRULES.forEach(function(r){if(r.re.test(txt))out.push(r)});
+ if(d.prof_test==='是')out.push({name:'专业考试',re:null,desc:'需参加专业科目考试'});
+ if(d.base_years>0)out.push({name:'基层年限'+d.base_years+'年',re:null,desc:'要求基层工作最低年限'+d.base_years+'年'});
+ return out}
+function tagChips(d){var ts=extractTags(d);if(!ts.length)return '<span class="meta">暂无可识别标签（备注未提及）</span>';
+ return ts.map(function(t){return '<span class="tag jade" title="'+esc(t.desc)+'">'+esc(t.name)+'</span>'}).join('')}
+function tagNames(){return TAGRULES.map(function(r){return r.name})}
+function countRestrict(d){var rest=0;
  if(d.politics_raw&&d.politics_raw.indexOf('不限')<0)rest++;
- if(d.base_years>0)rest++;if(d.prof_test==='是')rest++;
+ if(d.base_years>0)rest++;
+ if(d.prof_test==='是')rest++;
  if(d.major_raw&&d.major_raw.indexOf('不限')<0)rest++;
- var tier=(maxAll>=65||(cnt<=2&&rest>=3))?'热':((maxAll<55&&cnt>=4&&rest<=2)?'冷':'温');
- var cls=tier==='热'?'hot':(tier==='冷'?'cold':'warm');
- return '<span class="tag '+cls+'">热度：'+tier+'</span>'}
+ return rest}
+function heatInfo(d,hist){if(!hist||hist.min==null)return null;
+ var score=(hist.latest&&hist.latest.min_score!=null)?hist.latest.min_score:hist.min;
+ var passLine=(hist.max>100)?105:60;
+ var diff=score-passLine;
+ var cnt=d.count||0,rest=countRestrict(d);
+ var tier;
+ if(diff>20||cnt===1)tier='热';
+ else if(diff<5&&rest>=3)tier='冷';
+ else tier='温';
+ return {tier:tier,diff:diff,rest:rest,score:score,
+  reason:'近3年进面分 '+hist.min.toFixed(1)+'–'+hist.max.toFixed(1)+'，招'+cnt+'人'+(rest?('，'+rest+'项限制'):'')}}
+function heatChip(d,hist){var h=heatInfo(d,hist);if(!h)return '';
+ var cls=h.tier==='热'?'hot':(h.tier==='冷'?'cold':'warm');
+ return '<span class="tag '+cls+'" title="'+esc(h.reason)+'">热度：'+h.tier+'</span>'}
 function renderPosResult(){var r=POS.res;if(!r)return;
  var total=r.total||0,pages=r.pages||0;
  $('#posMeta').textContent='命中 '+total.toLocaleString()+' 个职位'+(r.exam?(' · '+r.exam):'')+' · 第 '+POS.page+'/'+(pages||1)+' 页';
@@ -408,9 +447,14 @@ function renderPosResult(){var r=POS.res;if(!r)return;
   if(r.diag&&Object.keys(r.diag).length){var names={edu:'学历',politics:'政治面貌',base:'基层年限',province:'省份',major:'专业'};
    msg+='<p class="meta">逐项放宽后的命中数：<br>'+Object.keys(r.diag).map(function(k){return '· 放宽'+(names[k]||k)+' → 约 '+r.diag[k].toLocaleString()+' 条'}).join('<br>')+'</p>'}
   $('#posList').innerHTML=msg;$('#posPager').innerHTML='';return}
- $('#posList').innerHTML=(r.results||[]).map(function(d){
+ var tagRow='<div class="chips" style="margin:8px 0 2px"><span class="meta" style="margin-right:4px">按标签筛本页：</span>'
+  +'<span class="chip'+(POS.tagFilter?'':' on')+'" onclick="POS.tagFilter=null;renderPosResult()">全部</span>'
+  +tagNames().map(function(t){return '<span class="chip'+(POS.tagFilter===t?' on':'')+'" onclick="POS.tagFilter=\''+t+'\';filterPosByTag(\''+t+'\')">'+t+'</span>'}).join('')+'</div>';
+ $('#posList').innerHTML=tagRow+(r.results||[]).map(function(d){
   return '<div class="prow" onclick="posDetailOpen(\''+esc(d.id)+'\')">'
-  +'<div class="prowT"><b>'+esc(d.title)+'</b>'+(FAVPOS.some(function(f){return f.id===d.id})?'<span style="color:var(--gold)">★</span>':'')+'</div>'
+  +'<div class="prowT"><b>'+esc(d.title)+'</b><span style="display:flex;gap:4px;align-items:center">'
+  +(FAVPOS.some(function(f){return f.id===d.id})?'<span style="color:var(--gold)">★</span>':'')
+  +'<button class="mini" onclick="event.stopPropagation();compareToggleById(\''+esc(d.id)+'\')">+对比</button></span></div>'
   +'<div class="prowS">'+esc(d.dept)+' · '+esc(d.work_place||d.province||'')+'</div>'
   +'<div class="chips"><span class="tag grey">招 '+d.count+' 人</span>'
   +(d.edu_raw?'<span class="tag grey">'+esc(trunc(d.edu_raw,10))+'</span>':'')
@@ -434,6 +478,64 @@ function posFavToggle(d,hist){var i=FAVPOS.findIndex(function(f){return f.id===d
   province:d.province,count:d.count,band:hist&&hist.min!=null?(hist.min.toFixed(1)+'–'+hist.max.toFixed(1)):null,at:Date.now()});
   toast('已收藏职位')}
  saveFavPos();refreshCurrent();renderFavPos()}
+function inCompare(id){return COMPARE.some(function(c){return c.id===id})}
+function compareToggleById(id){var d=null;
+ if(POS.res&&POS.res.results){for(var i=0;i<POS.res.results.length;i++){if(POS.res.results[i].id===id){d=POS.res.results[i];break}}}
+ if(!d&&POSCACHE[id])d=POSCACHE[id].d;
+ if(!d){toast('找不到该职位');return}
+ compareToggle(d,d.hist||null)}
+function compareToggle(d,hist){var i=COMPARE.findIndex(function(c){return c.id===d.id});
+ if(i>=0){COMPARE.splice(i,1);toast('已从对比篮移除')}
+ else{if(COMPARE.length>=4){toast('对比篮最多放 4 个职位');return}
+  COMPARE.unshift({id:d.id,title:d.title,dept:d.dept,unit:d.unit,deptCode:d.dept_code,code:d.code,
+   province:d.province,count:d.count,band:hist&&hist.min!=null?(hist.min.toFixed(1)+'–'+hist.max.toFixed(1)):null,
+   heat:heatInfo(d,hist),at:Date.now()});
+  toast('已加入对比篮')}
+ saveCompare();refreshCurrent();renderCompareBtn()}
+function compareRemove(id){COMPARE=COMPARE.filter(function(c){return c.id!==id});saveCompare();renderCompareBtn();
+ if(!COMPARE.length&&OVLS.length){popOvl()}
+ refreshCurrent()}
+function renderCompareBtn(){var b=document.getElementById('cmpFloat');if(!b)return;
+ b.style.display=COMPARE.length?'flex':'none';var n=b.querySelector('b');if(n)n.textContent=COMPARE.length}
+function compareOpen(){if(!COMPARE.length){toast('对比篮是空的，先在职位详情里加入');return}
+ pushOvl(function(){renderCompare()},null)}
+function renderCompare(){setHead('职位对比（'+COMPARE.length+'/4）');
+ var rows=[
+  {k:'部门',f:function(c){return c.dept||'—'}},
+  {k:'招考人数',f:function(c){return c.count+' 人'}},
+  {k:'省份',f:function(c){return c.province||'—'}},
+  {k:'近3年进面分',f:function(c){return c.band||'暂缺'}},
+  {k:'热度',f:function(c){return c.heat?c.heat.tier+'（'+c.heat.reason+'）':'暂缺'}},
+  {k:'职位代码',f:function(c){return c.code||'—'}}];
+ var html='<div class="card"><p class="meta">并排对比，差异行会标红。点职位名可进详情。</p><div style="overflow-x:auto"><table class="cmptable"><tr><th></th>'
+  +COMPARE.map(function(c){return '<th><a href="javascript:void(0)" onclick="posDetailOpen(\''+esc(c.id)+'\')">'+esc(trunc(c.title,12))+'</a><br><button class="mini grey" onclick="compareRemove(\''+esc(c.id)+'\')">移除</button></th>'}).join('')+'</tr>'
+  +rows.map(function(r){var vals=COMPARE.map(function(c){return r.f(c)});var diff=new Set(vals).size>1;
+   return '<tr'+(diff?' class="diff"':'')+'><td><b>'+r.k+'</b></td>'+vals.map(function(v){return '<td>'+esc(String(v))+'</td>'}).join('')+'</tr>'}).join('')
+  +'</table></div></div>'
+  +'<div class="card"><b>分享给家人看</b><p class="meta" style="margin:8px 0">把这 '+COMPARE.length+' 个职位的关键信息拼成一段文字，复制后发给家人过目。</p><button class="btn" onclick="shareCompare()">复制对比文本</button></div>';
+ ovlBodyEl.innerHTML=html}
+function fallbackCopy(txt){var ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();
+ try{document.execCommand('copy');toast('已复制')}catch(e){toast('复制失败，请手动选择')}document.body.removeChild(ta)}
+function copyText(txt,okMsg){if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(function(){toast(okMsg||'已复制')},function(){fallbackCopy(txt)})}else fallbackCopy(txt)}
+function shareCompare(){var txt='【考公选岗对比】共 '+COMPARE.length+' 个职位（仅供参考）：\n'+COMPARE.map(function(c,i){return (i+1)+'. '+c.title+'｜'+c.dept+'｜招'+c.count+'人｜'+(c.province||'')+'｜近3年进面分 '+(c.band||'暂缺')+'｜热度 '+(c.heat?c.heat.tier:'暂缺')}).join('\n')+'\n数据来源：官方职位表与国家公务员局历年面试名单。';
+ copyText(txt,'已复制对比文本')}
+function shareOne(d,hist){var h=heatInfo(d,hist);var ts=extractTags(d);
+ var txt='【考公选岗】'+d.title+'\n部门：'+d.dept+'\n招考：'+d.count+'人'+(d.province?(' · '+d.province):'')+'\n近3年进面分：'+(hist&&hist.min!=null?(hist.min.toFixed(1)+'–'+hist.max.toFixed(1)):'暂缺')+'\n热度：'+(h?h.tier+'（'+h.reason+'）':'暂缺')+(ts.length?('\n标签：'+ts.map(function(t){return t.name}).join('、')):'')+'\n数据来源：官方职位表与国家公务员局历年面试名单，仅供参考。';
+ copyText(txt,'已复制职位卡片')}
+function filterPosByTag(tag){if(!POS.res||!POS.res.results)return;
+ if(!tag){renderPosResult();return}
+ var list=POS.res.results;var el=$('#posList');if(el)el.innerHTML='<p class="meta">正在按「'+esc(tag)+'」筛选本页职位…</p>';
+ var jobs=list.map(function(d){return apiFetch('/api/position/'+encodeURIComponent(d.id),{timeout:20000}).then(function(det){return{d:d,tags:extractTags(det)}}).catch(function(){return{d:d,tags:[]}})});
+ Promise.all(jobs).then(function(pairs){var hit=pairs.filter(function(p){return p.tags.some(function(t){return t.name===tag})});
+  if(!hit.length){if(el)el.innerHTML='<p class="meta">本页没有带「'+esc(tag)+'」标签的职位。换个标签或翻页试试。</p>';return}
+  $('#posList').innerHTML=hit.map(function(p){var d=p.d;
+   return '<div class="prow" onclick="posDetailOpen(\''+esc(d.id)+'\')">'
+   +'<div class="prowT"><b>'+esc(d.title)+'</b>'+(FAVPOS.some(function(f){return f.id===d.id})?'<span style="color:var(--gold)">★</span>':'')+'</div>'
+   +'<div class="prowS">'+esc(d.dept)+' · '+esc(d.work_place||d.province||'')+'</div>'
+   +'<div class="chips"><span class="tag grey">招 '+d.count+' 人</span>'+bandChip(d.hist)+heatChip(d,d.hist)
+   +p.tags.map(function(t){return '<span class="tag jade" title="'+esc(t.desc)+'">'+esc(t.name)+'</span>'}).join('')+'</div>'
+   +'<div class="prowM">专业：'+esc(trunc(d.major_raw||'不限',60))+'</div></div>'}).join('');
+  var m=$('#posMeta');if(m)m.textContent='标签「'+tag+'」· 本页命中 '+hit.length+' 个（点「全部」恢复）'})}
 var POSCACHE={};
 function posDetailOpen(id){pushOvl(function(){renderPosLoading()},null);
  apiFetch('/api/position/'+encodeURIComponent(id),{timeout:25000}).then(function(d){
@@ -451,6 +553,8 @@ function makePosRenderer(d,h){return function(){setHead('职位详情');
  var bars=hist?hist.map(function(x){var l=Math.max(0,(x.min_score-domMin)/(domMax-domMin)*100),w=Math.max(4,(x.max_score-x.min_score)/(domMax-domMin)*100);
   return '<div class="mbar"><div class="lbl"><span>'+x.year+' 年 · '+x.positions+' 个同类岗 / '+x.entrants+' 人进面</span><span class="mono">'+x.min_score.toFixed(1)+' – '+x.max_score.toFixed(1)+'</span></div>'
   +'<div class="bscale"><span class="band" style="left:'+l+'%;width:'+w+'%"></span></div></div>'}).join(''):'<p class="meta">未匹配到该职位近 3 年进面分（外交部等单独公布的岗位暂缺）。</p>';
+ var hInfo=heatInfo(d,bandAll);var tags=extractTags(d);
+ var heatReason=hInfo?('热度'+hInfo.tier+'：'+hInfo.reason+'。'):('热度暂缺：未匹配到进面分。');
  ovlBodyEl.innerHTML=
  '<div class="card"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><b style="font-size:16.5px;line-height:1.5">'+esc(d.title)+'</b>'
  +'<button class="starbtn" onclick="rerenderOvl()" data-act="fav">'+(fav?'★ 已收藏':'☆ 收藏')+'</button></div>'
@@ -460,7 +564,15 @@ function makePosRenderer(d,h){return function(){setHead('职位详情');
  +(d.level?'<span class="tag grey">'+esc(d.level)+'</span>':'')
  +heatChip(d,bandAll)+'</div>'
  +'<p class="meta" style="margin-top:6px">'+esc(d.dept)+(d.unit&&d.unit!==d.dept?(' · '+esc(d.unit)):'')+' · '+esc(d.work_place||'')+(d.province?(' · '+esc(d.province)):'')+'</p>'
- +'<button class="btn'+(fav?' ghost':'')+'" style="margin-top:10px" id="favBtn">'+(fav?'★ 已收藏 · 点击取消':'☆ 收藏职位')+'</button>'
+ +'<div style="background:var(--mint);border-radius:12px;padding:10px 12px;margin-top:8px"><b style="font-size:13.5px">📇 职位解读卡</b><p class="meta" style="margin:6px 0 0;line-height:1.7">'+esc(heatReason)
+ +' 限制条件 '+countRestrict(d)+' 项（学历/政治/基层/专业）。'
+ +(d.org_type?(' 单位性质：'+esc(d.org_type)+'。'):'')
+ +(d.ratio?(' 面试比例 '+esc(d.ratio)+'。'):'')+'</p></div>'
+ +'<div class="chips" style="margin-top:10px"><span class="meta" style="margin-right:2px">标签：</span>'+tagChips(d)+'</div>'
+ +'<div class="row2" style="margin-top:10px"><button class="btn'+(fav?' ghost':'')+'" style="flex:1" id="favBtn">'+(fav?'★ 已收藏 · 点击取消':'☆ 收藏职位')+'</button>'
+ +'<button class="btn ghost" style="flex:1" id="cmpBtn">'+(inCompare(d.id)?'✓ 已在对比篮':'＋ 加入对比')+'</button></div>'
+ +'<div class="row2" style="margin-top:8px"><button class="btn ghost" style="flex:1" id="shareBtn">📋 复制职位卡片</button>'
+ +'<button class="btn ghost" style="flex:1" onclick="compareOpen()">对比篮（'+COMPARE.length+'/4）</button></div>'
  +'<p class="meta" style="margin-top:8px">职位代码 '+esc(d.code||'-')+(d.attr?(' · '+esc(d.attr)):'' )+'</p></div>'
  +'<div class="card"><b>📊 近 3 年进面分（同部门同名职位汇总）</b><div style="margin-top:10px">'+bars+'</div>'
  +'<p class="meta" style="margin-top:8px">来源：国家公务员局历年面试名单（2024–2026 国考），仅供参考，不构成预测或报考建议。</p></div>'
@@ -474,6 +586,8 @@ function makePosRenderer(d,h){return function(){setHead('职位详情');
  +(d.website&&d.website!=='无'?'<p class="meta">官网：'+esc(d.website)+'</p>':'')
  +'<p class="meta">数据来源：官方职位表（'+esc(d.exam||'')+'）。薪资与实时报名人数暂无官方数据，不展示。</p></div>';
  $('#favBtn').onclick=function(){posFavToggle(d,bandAll)};
+ var cb=$('#cmpBtn');if(cb)cb.onclick=function(){compareToggle(d,bandAll)};
+ var sh=$('#shareBtn');if(sh)sh.onclick=function(){shareOne(d,bandAll)};
  var sb=document.querySelector('.starbtn');if(sb)sb.onclick=function(){posFavToggle(d,bandAll)}}}
 function kvRow(k,v,pre){if(v==null||v==='')return '';return '<span class="k">'+esc(k)+'</span><span'+(pre?' style="white-space:pre-wrap"':'')+'>'+esc(v)+'</span>'}
 function noteBlock(note){var lines=String(note).split(/\n+/);var hid=lines.filter(function(l){return /(限|须|面向|仅|不低于|不得)/.test(l)});
