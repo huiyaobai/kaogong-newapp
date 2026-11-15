@@ -1,117 +1,179 @@
 <!DOCTYPE html>
+<!-- 热闹喜庆 v2（2026-11-15）：以 index.festive.html 为底，按 v0 五屏原型
+     （chat/app-ldKbO5d2NDX/artifact/Y1XLiICnvoVFCfJ66bPR3E6Z）升级，只换视觉，
+     排布（首页 6 组、题库页 4 组）与功能不动，真实数据口径不变，不编造。 -->
 <html lang="zh-CN"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#1e2b38">
+<meta name="theme-color" content="#D93025">
 <title>考公新App</title>
 <style>
-/* 2026-11-11 全新 UI: 「墨与朱」— 原创设计, 不抄上岸鸭.
-   变量名沿用旧名 (避免改 JS 内联样式里的 var(--jade) 等引用):
-   --jade 现在是朱红主色, --jaded 是深朱红, --mint 是暖沙底色. */
-:root{--ink:#1e2b38;--ink2:#33465c;--jade:#e0452f;--jaded:#b73220;--mint:#f6e8dc;--bg:#faf5ec;--card:#fff;--line:#e8dfcb;--sub:#7c7263;--red:#c0392b;--gold:#a97e10;--ok:#2e7d5b}
+/* ============================================================
+   2026-11-12 布局版（index.layout.html）— 按用户 2026-11-12 12:15
+   确认的线框图（design-review/layout-wireframe-20261112.html）
+   重建的整 App。排布以线框为准，首页 6 组、题库页 4 组，顺序不变。
+   布局（线框 10 组，全在、顺序不变）：
+   首页：①赛道 tab（公务员/选调/事业单位）②主任务大卡（左大选岗公告+
+   右小智能选岗/今日时政）③工具宫格 4×2④内容产品双卡（时政日报/
+   成语手册）⑤成绩卡（已练/正确率/连续打卡+本周打卡）⑥公告条一行。
+   题库页：①两级筛选（考试 国考/省考/选调 → 科目 6 模块）②工具宫格
+   3×2③成绩卡（与首页同一口径）④考点任务树（模块→子考点，已做/
+   总数+进度条；默认展开言语、判断）。
+   风格：线框自带的中性灰阶干净版（暖纸底 #f6f5f1 + 石板灰 #475569）。
+   不用之前被否的 6 版配色与装饰语言。以后换色只换下方 tokens，排布不动。
+   映射与诚实说明（哪些只切了态、哪些真联动）：
+   - 赛道 tab：真联动主任务大卡角标与公告条。公务员=本机公告（zhaokao.js
+     10 条，国考/国考补录/省考），角标为最新公告（浙江 2027 省考，2026-11-05）
+     + 距 2027 国考笔试天数（gkCountdown() 实时算）；选调、事业单位在本机
+     公告数据中无对应公告，诚实显示“本赛道暂无公告”，点进选岗页。
+     赛道切换不改选岗页检索（服务端按画像检索）与题库考试筛选。
+   - 限时练习：本 App 无独立限时练习入口，唯一的限时练习形态就是限时
+     模考（120 分钟），故映射到 go('mock')；格子副文案写明“限时模考”。
+   - 时政日报 / 今日时政：新增 pushShizheng() 覆盖层，读 window.QB_SHIZHENG
+     （OTA 同步后才有；本机内置基线不含时政）。未同步时诚实提示去
+     「我的 → 检查更新」同步，不做假入口。
+   - 考试筛选：真联动历年真题卷单与随机/智能组卷/按模块的出题范围
+     （bankPool/bankPapers）。选调笔试共用行测题库，出题范围为全部真题，
+     卷单显示全部并附注；省考本机真题为重庆市考卷。考点任务树总数为
+     2021–2025 全部真题题次（本机考点数据未按考试拆分），不随考试筛选变。
+   - 科目筛选：真联动任务树（只显示所选模块并展开）；点已选科目可取消。
+   - 任务树：已做数读本机进度（moduleAttempted/subAttempted），无进度为 0；
+     总数为考点频次数据（2021–2025，题次：言语 720、判断 705、资料 370、
+     常识 259、数量 220、政治 171）。点子考点行直接练该题型 10 题。
+   - 成绩卡：首页与题库页共用 scoreCardHtml()，同一口径（stats() + 打卡）；
+     无预测分模型，不出预测分；正确率未练题时为“—”。
+   - 旧首页的“今日任务”清单不在新首页单列（4 项动作分别由工具宫格/
+     成绩卡/公告条承接，打卡保留在成绩卡内）；“各模块进度”由题库页任务
+     树承接。todayTasksHtml()/moduleBarsHtml() 函数保留未删除，未调用。
+   - 入口导航修正（仅布局版）：现行版 bankOpen() 只渲染 #v-bank、不切
+     tab（其入口都在题库页内，从首页点不会切页）；新首页的工具格子与
+     成语手册卡走 bankTool()，先 go('bank') 再 bankOpen()，否则功能会
+     渲染在隐藏视图里。bankOpen() 本身未改。题库页内格子直接走 bankOpen()
+     （已在题库页），以保留考试/科目筛选。
+   - 倒计时：首页大卡用新增 gkDaysLeft() 按日历日差（考试日−今日）算，
+     2026-11-12 为 17 天，与线框一致；现行版 gkCountdown() 用 ceil 到
+     考试日 23:59:59，同一天会算出 18 天，故首页不用它，其他视图仍用原函数。
+   - 题库页工具宫格为线框指定的 6 项；申论真题、题目收藏保留在宫格下方
+     的“更多”行（仍是原有功能）；未完成练习/进行中模考的续练条保留在
+     题库页顶部（有内容时才出现）；旧版“最近练习”列表未保留。
+   - 选岗/模考/我的三个视图未改；数据文件、localStorage 键、函数名、
+     onclick、文案一律保留。底部导航 5 项不变。
+   红线：无鸭子/上岸鸭名/slogan/插画/文案；无拍照搜题、AI 批改、人工答疑、
+   预测分、银行/国企/教资赛道；数字与公告均来自本机数据文件，未编造。
+   ============================================================ */
+/* ============================================================
+   主题「热闹喜庆」（2026-11-14）— 按用户 2026-11-13 23:04 点选的感觉，
+   以一屏样稿 design-review/vibe-festive-home.html 为准，亮、大、喜庆。
+   三色 tokens（见下方 :root）：
+   朱红 #D93025（主色：主任务大卡、主按钮、选中态、徽章、公告条）
+   明金 #F5A623（亮色：倒计时数字、角标徽章、打卡按钮、进度条、金色内容卡）
+   暖纸 #FFF8EC（底色），文字近黑 #211A17（高对比）。
+   签名组件：
+   一「喜庆顶栏」：首页顶部朱红→橙金渐变通栏 + 金色圆点纹理 + 52px 金色
+     衬线倒计时数字 + 日期小字「金榜题名时」（只在首页顶部，不扩到其他页，
+     不做成大标题口号；倒计时与 hero 大卡同一数值，实时算，不写死）；
+   二「红底大卡」：主任务大卡朱红大色块 + 金色圆点纹理 + 金色徽章角标 +
+     30px/900 白色大标题；右两小卡白底 + 2px 墨色描边；
+   三「岸印」：完成/打卡态用朱红方印 + 金边，未完成态留虚线空印框；完成定义
+     同登岸版/金榜版（本题型唯一真题全部练完才盖印；已做数与进度条口径不变，
+     仍按题次）。
+   字体：倒计时数字与大标题用衬线加粗，正文与数字用系统无衬线。
+   文案不动：不改任何已有文案，不加新口号。
+   红线：无竞品亮黄作大面积底色（亮、大、喜庆由朱红 +
+   明金实现）；无鸭子/上岸鸭名/slogan/插画/文案。
+   换主题只换 tokens 与签名组件，排布不动（首页 6 组、题库页 4 组，见布局注释）。
+   ============================================================ */
+:root{--ink:#211A17;--ink2:#4A3A32;--jade:#D93025;--jaded:#8A5A00;--mint:#FFF3D6;--bg:#FFF8EC;--card:#FFFFFF;--line:#F0DFC0;--sub:#8A7A70;--red:#D93025;--gold:#F5A623;--ok:#2E7D5B;--violet:#D93025;--serif:Georgia,"Songti SC","Noto Serif CJK SC",serif}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink)}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;background-color:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
 body.lock{overflow:hidden}
 .phone{max-width:430px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
-.apphead{position:sticky;top:0;z-index:8;display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:rgba(250,245,236,.96);backdrop-filter:blur(6px);border-bottom:1px solid var(--line)}
-.apphead .brand{font-weight:900;font-size:17px}
-.apphead .brand::before{content:"";display:inline-block;width:12px;height:12px;background:var(--jade);border-radius:3px;margin-right:7px;vertical-align:-1px}
+.apphead{position:sticky;top:0;z-index:8;display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:rgba(246,245,241,.96);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.apphead .brand{font-weight:800;font-size:17px;letter-spacing:-.01em}
+.apphead .brand::before{content:"";display:inline-block;width:12px;height:12px;background:var(--jade);border-radius:3px;margin-right:8px;vertical-align:-1px}
 .hbtns{display:flex;gap:8px}
-.hbtn{position:relative;background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:12.5px;font-weight:700;color:var(--ink);cursor:pointer}
+.hbtn{position:relative;background:#fff;border:1px solid var(--line);border-radius:999px;padding:7px 13px;font-size:12.5px;font-weight:700;color:var(--ink);cursor:pointer}
 .hbtn .dot{position:absolute;top:-5px;right:-3px;background:var(--red);color:#fff;border-radius:999px;font-size:10px;padding:1px 5px;font-weight:800}
-main{flex:1;padding-bottom:86px}
+main{flex:1;padding-bottom:92px}
 .view{display:none}.view.on{display:block}
-.hero{background:linear-gradient(160deg,var(--ink),var(--ink2) 55%,var(--jaded));color:#fff;border-radius:0 0 24px 24px;padding:18px 20px 22px}
-.hero h1{margin:10px 0 8px;font-size:26px;line-height:1.4;font-weight:900}
-.hero h1 .hl{color:#f5c04a}
-.hero p{margin:0;color:#d9cfbe;font-size:13.5px;line-height:1.6}
-.hero .date{display:inline-block;background:rgba(255,255,255,.14);border-radius:999px;padding:6px 12px;font-size:12.5px;margin-top:12px}
-.hbadge{display:inline-block;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:5px 11px;font-size:12px;color:#e5dcc8}
-.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin:12px 14px;box-shadow:0 4px 14px rgba(60,40,20,.06)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin:12px 16px;box-shadow:0 1px 3px rgba(28,28,26,.05)}
 .card.note p{margin:6px 0 0}
-.sect{display:flex;justify-content:space-between;align-items:baseline;margin:18px 16px 4px}
-.sect h2{font-size:17px;margin:0;font-weight:900}
-.sect h2::before{content:"";display:inline-block;width:5px;height:16px;border-radius:3px;background:var(--jade);margin-right:8px;vertical-align:-2px}
+.sect{display:flex;justify-content:space-between;align-items:baseline;margin:20px 16px 6px}
+.sect h2{font-size:16px;margin:0;font-weight:800;letter-spacing:.01em}
+.sect h2::before{content:"";display:inline-block;width:4px;height:14px;border-radius:2px;background:var(--jade);margin-right:8px;vertical-align:-2px}
 .sect .rt{color:var(--sub);font-size:12.5px}
-.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:10px 14px}
-.kpi{background:#fff;border:1px solid var(--line);border-radius:16px;padding:13px 6px;text-align:center;box-shadow:0 4px 12px rgba(60,40,20,.05)}
-.kpi b{display:block;font-size:21px;font-variant-numeric:tabular-nums}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:10px 16px}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:13px 6px;text-align:center}
+.kpi b{display:block;font-size:21px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
 .kpi span{font-size:12px;color:var(--sub)}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 14px}
-.gcard{border:1px solid var(--line);border-radius:16px;padding:15px;cursor:pointer;min-height:86px;background:#fff;box-shadow:0 4px 12px rgba(60,40,20,.05)}
-.gcard b{font-size:16px;display:block;margin-bottom:5px}
-.gcard span{font-size:12.5px;color:var(--sub);line-height:1.5}
-.gcard.jade{background:var(--mint)}
-.gcard.teal2{background:#f7ecd4}
-.gcard.deep{background:linear-gradient(150deg,var(--ink2),var(--jaded));color:#fff}
-.gcard.deep span{color:#ecd9c8}
-.btn{background:var(--jade);color:#fff;border:0;border-radius:999px;padding:11px 18px;font-size:14.5px;font-weight:800;width:100%;cursor:pointer;font-family:inherit;box-shadow:0 4px 12px rgba(224,69,47,.28)}
-.btn.ghost{background:#fff;color:var(--ink);border:1.5px solid var(--line);box-shadow:0 2px 8px rgba(60,40,20,.05)}
+.btn{background:var(--jade);color:#fff;border:0;border-radius:13px;padding:12px 18px;font-size:15px;font-weight:700;width:100%;cursor:pointer;font-family:inherit;box-shadow:0 4px 12px rgba(71,85,105,.25)}
+.btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--line);box-shadow:none}
 .btn.ink{background:var(--ink2)}
-.btn.sm{padding:8px 14px;font-size:13px;width:auto}
+.btn.sm{padding:8px 14px;font-size:13px;width:auto;border-radius:10px}
 .btn:disabled{opacity:.45;cursor:default}
 .row2{display:flex;gap:8px}
-.chip{display:inline-block;padding:6px 13px;border-radius:999px;background:#fff;border:1px solid var(--line);font-size:13px;margin:3px 4px 3px 0;cursor:pointer;font-weight:700}
+.chip{display:inline-block;padding:7px 14px;border-radius:999px;background:#fff;border:1px solid var(--line);font-size:13px;margin:3px 4px 3px 0;cursor:pointer;font-weight:600;color:var(--ink2)}
 .chip.on{background:var(--jade);color:#fff;border-color:var(--jade)}
-.mini{background:var(--mint);color:var(--jaded);border:0;border-radius:999px;padding:5px 11px;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit}
-.mini.grey{background:#f0ebdd;color:var(--sub)}
-.task{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line);font-size:14px;gap:8px}
+.mini{background:var(--mint);color:var(--jaded);border:0;border-radius:999px;padding:5px 11px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+.mini.grey{background:#f1f1ee;color:var(--sub)}
+.task{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px;gap:8px}
 .task:last-child{border:0}
-.bar{height:8px;background:var(--line);border-radius:99px;overflow:hidden;margin:4px 0 8px}
+.bar{height:8px;background:#eef0f3;border-radius:99px;overflow:hidden;margin:4px 0 8px}
 .bar i{display:block;height:100%;background:var(--jade);border-radius:99px}
 .mbar{margin-bottom:8px}
 .mbar .lbl{display:flex;justify-content:space-between;font-size:12.5px;color:var(--sub)}
-.opt{display:block;width:100%;text-align:left;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:11px 13px;margin:8px 0;font-size:15px;cursor:pointer;line-height:1.6;font-family:inherit;color:var(--ink)}
-.opt .k{font-weight:900;color:var(--jaded);margin-right:8px}
-.opt.right{border-color:var(--ok);background:#e7f3ea}
+.opt{display:block;width:100%;text-align:left;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:12px 14px;margin:8px 0;font-size:15px;cursor:pointer;line-height:1.6;font-family:inherit;color:var(--ink)}
+.opt .k{font-weight:800;color:var(--jaded);margin-right:8px}
+.opt.right{border-color:var(--ok);background:#f0fdf4}
 .opt.right .k{color:var(--ok)}
-.opt.wrong{border-color:var(--red);background:#fdecea}
+.opt.wrong{border-color:var(--red);background:#fef2f2}
 .opt.sel{border-color:var(--jade);background:var(--mint)}
 .opt.dis{cursor:default;opacity:.9}
 .qstem{font-size:16px;line-height:1.8;margin:8px 0}
 .qstem img,.opt img,.qmat img,.slpre img,.ans img{max-width:100%;height:auto;border-radius:8px;margin:4px 0}
 .qmeta{font-size:12px;color:var(--sub);display:flex;justify-content:space-between;align-items:center;gap:8px}
 .starbtn{background:none;border:0;font-size:18px;cursor:pointer;padding:2px 6px;color:var(--gold);font-family:inherit}
-.qmat{background:#f5efe2;border-radius:14px;padding:10px 13px;margin:8px 0;font-size:14px;line-height:1.8}
+.qmat{background:#f8f8f6;border-radius:14px;padding:10px 13px;margin:8px 0;font-size:14px;line-height:1.8}
 .qmat summary{cursor:pointer;font-weight:800;color:var(--ink2);font-size:13.5px}
 .qmat>div{margin-top:8px}
-.ans{background:#f7f0df;border-radius:14px;padding:12px 13px;margin-top:10px;font-size:14px;line-height:1.75;white-space:pre-wrap}
+.ans{background:#f8f8f6;border-radius:14px;padding:12px 13px;margin-top:10px;font-size:14px;line-height:1.75;white-space:pre-wrap}
 .ans b{color:var(--jaded)}
-.meta{font-size:12px;color:var(--sub)}
+.meta{font-size:12px;color:var(--sub);line-height:1.6}
 .small{font-size:12.5px;color:var(--sub);text-align:center;line-height:1.6}
-.big{font-size:46px;font-weight:900;text-align:center;font-variant-numeric:tabular-nums;margin:6px 0}
-.tag{display:inline-block;border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:800;margin:2px 4px 2px 0;vertical-align:1px;white-space:nowrap}
-.tag.hot{background:#fdecea;color:var(--red)}
-.tag.warm{background:#faf3e0;color:var(--gold)}
-.tag.cold{background:#e6f2e8;color:var(--ok)}
-.tag.grey{background:#f0ebdd;color:var(--sub)}
+.big{font-size:44px;font-weight:800;text-align:center;font-variant-numeric:tabular-nums;margin:6px 0;letter-spacing:-.01em}
+.tag{display:inline-block;border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:700;margin:2px 4px 2px 0;vertical-align:1px;white-space:nowrap}
+.tag.hot{background:#fef2f2;color:var(--red)}
+.tag.warm{background:#fffbeb;color:#b45309}
+.tag.cold{background:#f0fdf4;color:var(--ok)}
+.tag.grey{background:#f1f1ee;color:var(--sub)}
 .tag.new{background:var(--red);color:#fff}
 .tag.jade{background:var(--mint);color:var(--jaded)}
-.pill{display:inline-block;background:var(--mint);color:var(--jaded);border-radius:999px;padding:2px 9px;font-size:12px;font-weight:800;margin-left:7px;vertical-align:2px}
-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:#fff;border-radius:20px 20px 0 0;box-shadow:0 -4px 20px rgba(60,40,20,.10);display:flex;z-index:9;padding:7px 4px calc(7px + env(safe-area-inset-bottom))}
-nav button{flex:1;background:none;border:0;font-size:11px;color:#9a8f7c;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 0 2px;font-family:inherit}
+.pill{display:inline-block;background:var(--mint);color:var(--jaded);border-radius:999px;padding:2px 9px;font-size:12px;font-weight:700;margin-left:7px;vertical-align:2px}
+nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:#fff;border-top:1px solid var(--line);display:flex;z-index:9;padding:8px 4px calc(8px + env(safe-area-inset-bottom))}
+nav button{flex:1;background:none;border:0;font-size:11px;color:#a39a8c;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 0 2px;font-family:inherit;font-weight:600}
 nav button .ic{font-size:20px;line-height:1.1}
-nav button.on{color:var(--jaded);font-weight:800}
-nav button.on::after{content:"";width:16px;height:3px;border-radius:99px;background:var(--jade);margin-top:1px}
-.toast{position:fixed;left:50%;bottom:92px;transform:translateX(-50%) translateY(8px);background:var(--ink);color:#fff;border-radius:999px;padding:9px 16px;font-size:13.5px;font-weight:700;opacity:0;pointer-events:none;transition:all .25s;z-index:80;max-width:86%;text-align:center}
+nav button.on{color:var(--jade);font-weight:700}
+nav button.on::after{content:"";width:18px;height:3px;border-radius:99px;background:var(--jade);margin-top:1px}
+.toast{position:fixed;left:50%;bottom:92px;transform:translateX(-50%) translateY(8px);background:var(--ink);color:#fff;border-radius:12px;padding:10px 16px;font-size:13.5px;font-weight:600;opacity:0;pointer-events:none;transition:all .25s;z-index:80;max-width:86%;text-align:center;box-shadow:0 8px 24px rgba(28,28,26,.25)}
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 #ovl{position:fixed;inset:0;background:var(--bg);z-index:40;display:none;flex-direction:column}
 #ovl.on{display:flex}
-.ovlhead{position:sticky;top:0;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 14px;background:rgba(250,245,236,.97);backdrop-filter:blur(6px);border-bottom:1px solid var(--line);z-index:5;font-weight:900;font-size:15.5px;min-height:52px}
+.ovlhead{position:sticky;top:0;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 14px;background:rgba(246,245,241,.96);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line);z-index:5;font-weight:800;font-size:15.5px;min-height:52px}
 .ovlhead .t{flex:1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.backbtn{background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 13px;font-size:13px;font-weight:800;cursor:pointer;color:var(--ink);font-family:inherit;min-width:52px}
+.backbtn{background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 13px;font-size:13px;font-weight:700;cursor:pointer;color:var(--ink);font-family:inherit;min-width:52px}
 .ovlbody{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:40px}
 .ovlbody .card{margin-top:12px}
-#cmodal{position:fixed;inset:0;background:rgba(30,20,10,.45);z-index:70;display:none;align-items:center;justify-content:center;padding:24px}
+#cmodal{position:fixed;inset:0;background:rgba(28,28,26,.45);z-index:70;display:none;align-items:center;justify-content:center;padding:24px}
 #cmodal.on{display:flex}
-.cmbox{background:#fff;border-radius:18px;padding:20px;max-width:320px;width:100%}
+.cmbox{background:#fff;border-radius:20px;padding:20px;max-width:320px;width:100%;box-shadow:0 20px 48px rgba(28,28,26,.25)}
 .cmbox .cmmsg{font-size:14.5px;line-height:1.7;font-weight:600;margin-bottom:16px;white-space:pre-line}
 .cmbox .cmrow{display:flex;gap:8px}
-input[type=text],input[type=number],input[type=search],select{width:100%;padding:11px;border:1.5px solid var(--line);border-radius:13px;font-size:15px;font-family:inherit;background:#fff;margin:5px 0;color:var(--ink)}
-label.fl{display:block;font-size:13px;font-weight:800;margin:10px 0 2px;color:var(--ink2)}
-.prow{border:1px solid var(--line);border-radius:14px;padding:12px 13px;margin:9px 0;background:#fff;cursor:pointer}
+input[type=text],input[type=number],input[type=search],select{width:100%;padding:12px;border:1.5px solid var(--line);border-radius:12px;font-size:15px;font-family:inherit;background:#fff;margin:5px 0;color:var(--ink)}
+input[type=text]:focus,input[type=number]:focus,input[type=search]:focus,select:focus{outline:none;border-color:var(--jade);box-shadow:0 0 0 3px rgba(71,85,105,.15)}
+label.fl{display:block;font-size:13px;font-weight:700;margin:10px 0 2px;color:var(--ink2)}
+.prow{border:1px solid var(--line);border-radius:16px;padding:13px 14px;margin:9px 0;background:#fff;cursor:pointer}
 .prowT{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
-.prowT b{font-size:15px;line-height:1.5}
+.prowT b{font-size:15px;line-height:1.5;font-weight:800}
 .prowS{font-size:12.5px;color:var(--sub);margin:3px 0}
 .prowM{font-size:12.5px;color:var(--sub);line-height:1.6;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .chips{margin:6px 0 2px}
@@ -126,35 +188,210 @@ label.fl{display:block;font-size:13px;font-weight:800;margin:10px 0 2px;color:va
 .tl li:last-child::after{display:none}
 .tl li b{color:var(--jaded)}
 .pal{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin-top:10px}
-.palbtn{aspect-ratio:1;border:1.5px solid var(--line);border-radius:9px;background:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--sub);padding:0}
+.palbtn{aspect-ratio:1;border:1.5px solid var(--line);border-radius:10px;background:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--sub);padding:0}
 .palbtn.done{background:var(--mint);border-color:var(--jade);color:var(--jaded)}
 .palbtn.mark{border-color:var(--gold);color:var(--gold);box-shadow:inset 0 0 0 1px var(--gold)}
 .palbtn.cur{outline:2px solid var(--ink2);outline-offset:1px}
-.bscale{position:relative;height:26px;background:#f0ebdd;border-radius:8px;margin:6px 0 2px}
+.bscale{position:relative;height:26px;background:#eef0f3;border-radius:8px;margin:6px 0 2px}
 .bscale .band{position:absolute;top:6px;height:14px;background:var(--mint);border:1.5px solid var(--jade);border-radius:8px}
 .bscale .sc{position:absolute;top:-2px;width:3px;height:30px;background:var(--gold);border-radius:2px}
-.bsrow{display:flex;justify-content:space-between;font-size:12px;color:var(--sub);margin-top:8px;border-bottom:1px dashed var(--line);padding:5px 0}
+.bsrow{display:flex;justify-content:space-between;font-size:12px;color:var(--sub);margin-top:8px;border-bottom:1px solid var(--line);padding:6px 0}
 .bsrow:last-child{border:0}
 .mono{font-variant-numeric:tabular-nums}
-.imgmiss{display:inline-block;background:#f4eee1;border:1px dashed var(--line);color:var(--sub);padding:8px 12px;border-radius:8px;font-size:12px}
+.imgmiss{display:inline-block;background:#f1f1ee;border:1px solid var(--line);color:var(--sub);padding:8px 12px;border-radius:8px;font-size:12px}
 .slpre{white-space:pre-wrap;font-size:14.5px;line-height:1.9;margin:8px 0}
-.slmat{background:#f6f0e3;border-radius:14px;padding:10px 13px;margin:10px 0}
+.slmat{background:#f8f8f6;border-radius:14px;padding:10px 13px;margin:10px 0}
 .slmat summary{cursor:pointer;font-weight:800;color:var(--ink2)}
 .slq{border:1px solid var(--line);border-radius:14px;padding:12px 13px;margin:10px 0;background:#fff}
-.subrow{display:flex;justify-content:space-between;align-items:center;padding:10px 2px;border-bottom:1px solid var(--line);cursor:pointer;font-size:14.5px;gap:8px}
+.subrow{display:flex;justify-content:space-between;align-items:center;padding:11px 2px;border-bottom:1px solid var(--line);cursor:pointer;font-size:14.5px;gap:8px}
 .subrow:last-child{border:0}
 .dash{font-size:12.5px;color:var(--sub)}
 .synw{border-left:3px solid var(--jade);padding-left:10px;margin:10px 0}
 .synw b{font-size:15px}
 .gtab{display:flex;gap:8px;margin:4px 0 10px}
-.resume{background:#fdf6e8;border:1px solid #ecd9ac;border-radius:14px;padding:12px 14px;margin:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13.5px;font-weight:700}
+.resume{background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:12px 14px;margin:10px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13.5px;font-weight:700}
 .cmptable{border-collapse:collapse;width:100%;font-size:13px;min-width:340px}
 .cmptable th,.cmptable td{border:1px solid var(--line);padding:8px 9px;text-align:left;vertical-align:top;line-height:1.55}
 .cmptable th{background:var(--mint);font-size:13px}
-.cmptable th a{color:var(--ink);text-decoration:none;font-weight:900}
-.cmptable tr.diff td{background:#fdf0ec}
-.cmptable tr.diff td:first-child{background:#fdecea}
+.cmptable th a{color:var(--ink);text-decoration:none;font-weight:800}
+.cmptable tr.diff td{background:#f8fafc}
+.cmptable tr.diff td:first-child{background:#eef0f3}
+/* --- 布局版新增：赛道 / 主任务 / 工具宫格 / 内容双卡 / 成绩卡 / 公告条 / 任务树 --- */
+.trk{display:flex;gap:8px;padding:14px 16px 2px}
+.trk button{flex:1;padding:10px 0;border:1px solid var(--line);border-radius:12px;background:#fff;font-size:14px;font-weight:700;color:var(--ink2);cursor:pointer;font-family:inherit}
+.trk button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.hero2{display:grid;grid-template-columns:1.35fr 1fr;gap:10px;margin:12px 16px 0}
+.hero-big{grid-row:span 2;background:var(--ink);color:#fff;border-radius:16px;padding:16px;cursor:pointer;display:flex;flex-direction:column;justify-content:space-between;min-height:132px}
+.hero-big .hb-tag{display:inline-block;background:#fff;color:var(--ink);border-radius:999px;padding:3px 9px;font-size:11px;font-weight:800;align-self:flex-start}
+.hero-big b{font-size:19px;line-height:1.4;display:block;margin:10px 0 4px}
+.hero-big span{font-size:12.5px;color:#c9c9c4;line-height:1.6}
+.hero-big .hb-go{font-size:12.5px;font-weight:700;margin-top:10px;color:#fff}
+.hero-sm{background:#fff;border:1px solid var(--line);border-radius:16px;padding:13px 14px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;gap:3px;min-height:61px}
+.hero-sm b{font-size:14.5px}
+.hero-sm span{font-size:12px;color:var(--sub);line-height:1.5}
+.tgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 16px}
+.tgrid.three{grid-template-columns:repeat(3,1fr)}
+.tcell{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 6px 10px;text-align:center;cursor:pointer}
+.tcell .ti{font-size:21px;line-height:1.2}
+.tcell b{display:block;font-size:13px;margin-top:6px;font-weight:700}
+.tcell span{display:block;font-size:11px;color:var(--sub);margin-top:3px;line-height:1.4}
+.duo2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 16px}
+.duo{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px;cursor:pointer}
+.duo b{font-size:14.5px;display:block}
+.duo span{font-size:12px;color:var(--sub);line-height:1.6;display:block;margin-top:5px}
+.duo .go{font-size:12px;font-weight:700;color:var(--jaded);margin-top:8px;display:block}
+.score{background:#fff;border:1px solid var(--line);border-radius:16px;margin:10px 16px;padding:16px}
+.score .srow{display:flex;justify-content:space-between;align-items:center}
+.score .srow b{font-size:16px}
+.wk{display:flex;gap:6px;margin-top:14px}
+.wkday{flex:1;text-align:center;font-size:11px;color:var(--sub)}
+.wkday i{display:block;width:26px;height:26px;margin:4px auto 0;border-radius:50%;border:1.5px solid var(--line);background:#fff;font-style:normal;line-height:24px;font-size:12px;color:var(--sub)}
+.wkday.on i{background:var(--jade);border-color:var(--jade);color:#fff}
+.wkday.on{color:var(--ink2);font-weight:700}
+.ntc{display:flex;justify-content:space-between;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:12px;margin:10px 16px;padding:12px 14px;font-size:13.5px;cursor:pointer}
+.ntc .nt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ntc .tag2{flex:0 0 auto;font-size:11px;font-weight:800;color:var(--jaded);background:var(--mint);border-radius:999px;padding:3px 8px}
+.filt{padding:12px 16px 0}
+.filt .flbl{font-size:12px;color:var(--sub);font-weight:700;margin:8px 0 6px}
+.filt .chips{margin:0}
+.tree{margin:10px 16px}
+.node{background:#fff;border:1px solid var(--line);border-radius:14px;margin-bottom:8px;overflow:hidden}
+.nhead{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:13px 14px;cursor:pointer}
+.nhead .nm{flex:1;min-width:0}
+.nhead .nm b{font-size:14.5px;display:block}
+.nhead .nm span{font-size:12px;color:var(--sub)}
+.nhead .nc{font-size:12.5px;color:var(--ink2);font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
+.nhead .chev{color:var(--sub);font-size:13px;flex:0 0 auto}
+.nbar{height:5px;background:#eef0f3;border-radius:99px;margin:0 14px 12px;overflow:hidden}
+.nbar i{display:block;height:100%;background:var(--jade);border-radius:99px}
+.kids{border-top:1px solid var(--line)}
+.kid{display:block;padding:11px 14px;cursor:pointer;border-bottom:1px solid #f0f0ec}
+.kid:last-child{border-bottom:0}
+.krow{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.kid .kn{flex:1;min-width:0}
+.kid .kn b{font-size:13.5px;font-weight:600}
+.kid .kn span{color:var(--sub);font-size:12px;margin-left:6px}
+.kid .kc{font-size:12.5px;color:var(--ink2);font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
+.kbar{height:4px;background:#eef0f3;border-radius:99px;margin:7px 0 0;overflow:hidden}
+.kbar i{display:block;height:100%;background:var(--jade);border-radius:99px}
+
+/* ============================================================
+   主题「热闹喜庆」追加层 — 只换视觉，排布不动。
+   ============================================================ */
+/* ---- 顶部 apphead：朱红→橙金渐变（与首页喜庆顶栏同一语言） ---- */
+.apphead{background:linear-gradient(135deg,#D93025 0%,#E8501F 60%,#F5A623 100%);border-bottom:2px solid #211A17}
+.apphead .brand{color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.18)}
+.apphead .brand::before{background:#FFE9A8;border:1.5px solid #211A17}
+.hbtn{background:#fff;color:#D93025;border:2px solid #211A17;box-shadow:0 2px 0 #211A17}
+/* ---- 签名组件一「喜庆顶栏」：渐变 + 金色圆点纹理 + 52px 金色倒计时 ---- */
+.festive{background:linear-gradient(135deg,#D93025 0%,#E8501F 55%,#F5A623 100%);padding:18px 16px 20px;position:relative;overflow:hidden;text-align:center;color:#fff}
+.festive::before{content:"";position:absolute;inset:0;background-image:radial-gradient(circle,#FFD97A 1.6px,transparent 1.7px),radial-gradient(circle,#fff 1.2px,transparent 1.3px);background-size:34px 34px,26px 26px;background-position:6px 8px,20px 22px;opacity:.55}
+.festive .fv-lab{position:relative;font-size:14px;font-weight:700;letter-spacing:1px}
+.festive .fv-num{position:relative;font-family:var(--serif);font-size:52px;line-height:1.05;font-weight:900;color:#FFE9A8;text-shadow:0 3px 0 rgba(0,0,0,.22)}
+.festive .fv-num span{font-size:22px}
+.festive .fv-date{position:relative;font-size:13px;font-weight:700;margin-top:2px}
+/* ---- 组标题：19px/900 + 金色渐变短线 + ✦ ---- */
+.sect h2{font-size:19px;font-weight:900}
+.sect h2::before{width:8px;height:20px;background:linear-gradient(180deg,#F5A623,#D93025);border-radius:4px;border:1.5px solid #211A17}
+#v-home .sect h2::after,#v-bank .sect h2::after{content:"✦";color:#F5A623;font-size:15px;margin-left:2px}
+/* ---- 赛道 tab：2px 墨色描边，选中态朱红 + 硬阴影 ---- */
+.trk button{border:2px solid #211A17;border-radius:14px;font-size:16px;font-weight:800;padding:11px 0}
+.trk button.on{background:#D93025;color:#fff;border-color:#211A17;box-shadow:0 3px 0 #211A17}
+/* ---- 签名组件二「红底大卡」：朱红大色块 + 金色圆点纹理 + 金徽章 + 30px/900 白标题 ---- */
+.hero-big{position:relative;background:radial-gradient(rgba(255,217,122,.85) 2px,transparent 2.2px) 8px 6px/22px 22px,#D93025;border:2px solid #211A17;border-radius:18px;box-shadow:0 4px 0 #211A17;min-height:150px}
+.hero-big b{font-size:30px;font-weight:900;color:#fff;line-height:1.25;text-shadow:0 2px 0 rgba(0,0,0,.2)}
+.hero-big span{color:#FFE9E4;font-weight:700}
+.hero-big .hb-tag{background:#F5A623;color:#211A17;border:2px solid #211A17;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:900;box-shadow:0 2px 0 #211A17}
+.hero-big .hb-go{display:inline-block;background:#fff;color:#D93025;font-size:13px;font-weight:900;border:2px solid #211A17;border-radius:999px;padding:6px 12px}
+.hero-sm{border:2px solid #211A17;border-radius:18px;box-shadow:0 4px 0 #211A17}
+.hero-sm b{font-size:16px;font-weight:900}
+/* ---- 工具宫格：大图标瓷砖（红/金交替）+ 粗描边 + 加粗标签 ---- */
+.tcell{border:2px solid #211A17;border-radius:16px;box-shadow:0 3px 0 #211A17}
+.tcell .ti{width:54px;height:54px;margin:0 auto;border:2px solid #211A17;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:0 3px 0 #211A17}
+.tcell:nth-child(odd) .ti{background:#FDECEA}
+.tcell:nth-child(even) .ti{background:#FFF3D6}
+.tcell b{font-size:13px;font-weight:800}
+/* ---- 内容双卡：一金一红，大色块 ---- */
+.duo{border:2px solid #211A17;border-radius:18px;box-shadow:0 4px 0 #211A17;position:relative;overflow:hidden}
+.duo2 .duo:first-child{background:linear-gradient(135deg,#F5A623,#F7B733)}
+.duo2 .duo:first-child::before{content:"";position:absolute;inset:0;background-image:radial-gradient(circle,rgba(255,255,255,.7) 1.8px,transparent 2px);background-size:18px 18px;opacity:.6}
+.duo2 .duo:last-child{background:#D93025}
+.duo b{font-size:17px;font-weight:900}
+.duo2 .duo:last-child b{color:#fff}
+.duo span{font-weight:700}
+.duo2 .duo:last-child span{color:#FFE9E4}
+.duo .go{display:inline-block;background:#fff;color:#211A17;border:2px solid #211A17;border-radius:999px;padding:5px 11px;font-size:12px;font-weight:900}
+/* ---- 成绩卡：粗描边 + 金色打卡按钮 + 30px/900 红色大数字 ---- */
+.score{border:2px solid #211A17;border-radius:18px;box-shadow:0 4px 0 #211A17}
+.score .mini{background:linear-gradient(135deg,#F5A623,#F7B733);color:#211A17;border:2px solid #211A17;border-radius:999px;padding:6px 16px;font-size:13px;font-weight:900;box-shadow:0 2px 0 #211A17}
+.score .kpi b{font-size:30px;font-weight:900}
+.score .kpi:first-child b,.score .kpi:last-child b{color:#D93025}
+.score .kpi{border:1.5px solid var(--line)}
+/* ---- 周打卡：金色虚线空印框；已打卡 = 朱红方印 + 金边 ---- */
+.wkday i{width:26px;height:26px;line-height:22px;border:2px dashed #F5A623;border-radius:8px;background:#FFF9E8;color:#B97A00;font-size:12px;font-weight:800}
+.wkday.on i{font-size:0;background:#D93025;border:2px solid #211A17;border-radius:8px;box-shadow:0 0 0 1.5px #F5A623}
+.wkday.on i::after{content:"\5CB8";font-size:12px;line-height:22px;color:#FFF7EA;font-family:var(--serif);font-weight:700}
+/* ---- 公告条：红描边 pill + 红色日期 pill ---- */
+.ntc{border:2px solid #D93025;border-radius:999px;box-shadow:0 3px 0 #211A17}
+.ntc .tag2{background:#D93025;color:#fff}
+/* ---- 卡片与按钮：粗描边 + 硬阴影（喜庆语言贯穿 5 个 Tab） ---- */
+.card{border:2px solid #211A17;border-radius:18px;box-shadow:0 3px 0 #211A17}
+.btn{box-shadow:0 4px 12px rgba(217,48,37,.35)}
+.btn.ghost{box-shadow:0 2px 0 #211A17}
+.chip{border:1.5px solid #211A17}
+input[type=text]:focus,input[type=number]:focus,input[type=search]:focus,select:focus{border-color:#D93025;box-shadow:0 0 0 3px rgba(245,166,35,.30)}
+/* ---- 进度条：金色渐变 ---- */
+.bar i,.nbar i,.kbar i{background:linear-gradient(90deg,#F5A623,#F0A500)}
+.bar,.nbar,.kbar{background:#F8EBCB}
+/* ---- 签名组件三「岸印」（朱红方印 + 金边；完成定义同登岸版/金榜版） ---- */
+.jbox{display:inline-block;width:22px;height:22px;line-height:20px;text-align:center;border:1.5px dashed #F5A623;border-radius:5px;margin-right:8px;vertical-align:-5px}
+.jbox.on{font-size:0;background:#D93025;border:1.5px solid #211A17;border-radius:5px;box-shadow:0 0 0 1.5px #F5A623}
+.jbox.on::after{content:"\5CB8";font-size:12px;font-family:var(--serif);font-weight:700}
+.kid.done .kn b::after{content:"\5CB8";display:inline-block;margin-left:8px;background:#D93025;color:#FFF7EA;font-family:var(--serif);font-size:12px;font-weight:700;line-height:1;padding:4px 6px;border:1.5px solid #F5A623;border-radius:3px;vertical-align:1px}
+.kid.done .kbar i{background:linear-gradient(90deg,#F5A623,#F0A500)}
+.node.done .nc::after{content:"\5CB8";display:inline-block;margin-left:6px;background:#D93025;color:#FFF7EA;font-family:var(--serif);font-size:12px;font-weight:700;line-height:1;padding:4px 6px;border:1.5px solid #F5A623;border-radius:3px}
+/* ---- 底部导航选中态：朱红 ---- */
+nav button.on{color:#D93025}
+nav button.on::after{background:#D93025}
+
+/* ============================================================
+   主题「热闹喜庆 v2」追加层（2026-11-15）— 以 index.festive.html 为底，
+   按 v0 五屏原型（chat/app-ldKbO5d2NDX/artifact/Y1XLiICnvoVFCfJ66bPR3E6Z）升级。
+   只换视觉，排布与功能不动；真实数据口径不变，不编造。
+   ① 首页问候行（.greet：问候小字 + 大字标题，位于倒计时上方）
+   ② 工具图标浅色圆角底（.ti 去重描边与硬阴影；卡片仍 2px 墨色描边 + 硬阴影）
+   ③ 周打卡已打卡态改为朱红实心圆 + 白色对勾（.wkday.on i；未打卡仍金色虚线空框）
+   ④ 岗位卡视觉对齐（.prow：2px 墨色描边 + 硬阴影；热度仍用 P2 公式文字标签）
+   ⑤ 迷你按钮统一金色醒目态（.mini；灰色次级态保留）
+   ⑥ 组标题 ✦ 扩展到 5 个 Tab
+   ⑦ 我的页首卡红底头像区（v0 我的页做法）
+   ⑧ 模考/题库续练条暖纸化（.resume）
+   岸印定义不变（本题型唯一真题全部练完才盖印；周打卡不再用岸字）。
+   ============================================================ */
+/* ① 问候行 */
+.greet{padding:20px 16px 0}
+.greet-hi{font-size:14px;font-weight:800;color:#B97A00;letter-spacing:1px}
+.greet-big{font-size:28px;font-weight:900;letter-spacing:-.01em;margin-top:4px;line-height:1.3}
+/* ② 工具图标：浅粉/浅黄圆角底（v0 做法） */
+.tcell .ti{border:0;box-shadow:none;border-radius:18px}
+/* ③ 周打卡已打卡态：朱红实心圆 + 白色对勾 */
+.wkday.on i{font-size:12px;background:#D93025;border:2px solid #211A17;border-radius:50%;box-shadow:0 0 0 1.5px #F5A623;color:#fff}
+.wkday.on i::after{content:none}
+/* ④ 岗位卡 */
+.prow{border:2px solid #211A17;box-shadow:0 3px 0 #211A17}
+/* ⑤ 迷你按钮统一金色 */
+.mini{background:linear-gradient(135deg,#F5A623,#F7B733);color:#211A17;border:2px solid #211A17;border-radius:999px;padding:6px 14px;font-weight:900;box-shadow:0 2px 0 #211A17}
+.mini.grey{background:#f1f1ee;color:var(--sub);border:1.5px solid var(--line);box-shadow:none;font-weight:700}
+/* ⑥ 组标题 ✦ 扩展到 5 个 Tab */
+#v-choose .sect h2::after,#v-mock .sect h2::after,#v-mine .sect h2::after{content:"✦";color:#F5A623;font-size:15px;margin-left:2px}
+/* ⑦ 我的页首卡：红底头像区 */
+#v-mine>.card:nth-of-type(2){background:linear-gradient(135deg,#D93025,#E8501F);border:2px solid #211A17;box-shadow:0 4px 0 #211A17}
+#v-mine>.card:nth-of-type(2) b{color:#fff}
+#v-mine>.card:nth-of-type(2) .meta{color:#FFE9E4}
+/* ⑧ 续练条暖纸化 */
+.resume{background:#FFF3D6;border:2px solid #211A17;box-shadow:0 3px 0 #211A17}
 </style>
+
 </head>
 <body>
 <div class="phone">
@@ -179,7 +416,7 @@ label.fl{display:block;font-size:13px;font-weight:800;margin:10px 0 2px;color:va
  <button data-v="mock" onclick="go('mock')"><span class="ic">⏱️</span>模考</button>
  <button data-v="mine" onclick="go('mine')"><span class="ic">👤</span>我的</button>
 </nav>
-<button id="cmpFloat" onclick="compareOpen()" style="display:none;position:fixed;right:14px;bottom:92px;z-index:30;align-items:center;gap:6px;background:var(--jade);color:#fff;border:0;border-radius:999px;padding:10px 14px;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 6px 16px rgba(224,69,47,.35);font-family:inherit">⚖️ 对比篮 <b>0</b></button>
+<button id="cmpFloat" onclick="compareOpen()" style="display:none;position:fixed;right:14px;bottom:92px;z-index:30;align-items:center;gap:6px;background:var(--jade);color:#fff;border:0;border-radius:999px;padding:10px 14px;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 6px 16px rgba(180,83,42,.35);font-family:inherit">⚖️ 对比篮 <b>0</b></button>
 </div>
 <div id="ovl">
  <div class="ovlhead"><button class="backbtn" onclick="ovlBack()">‹ 返回</button><span class="t" id="ovlTitle"></span><span style="min-width:52px"></span></div>
@@ -321,7 +558,7 @@ function todayTasksHtml(){ensureToday();var t=ST.today;
   {ok:t.wrongRedo>=5,txt:'错题重做 5 题（'+Math.min(t.wrongRedo,5)+'/5）',act:"bankOpen('wrong')"},
   {ok:ST.checkin.last===todayStr(),txt:'每日打卡',act:'checkIn()'},
   {ok:t.notice,txt:'浏览一条公告',act:'pushNotices()'}];
- return items.map(function(i){return '<div class="task"><span>'+(i.ok?'✅':'⬜')+' '+esc(i.txt)+'</span><button class="mini '+(i.ok?'grey':'')+'" '+(i.ok?'disabled':'onclick="'+i.act+'"')+'>'+(i.ok?'已完成':'去完成')+'</button></div>'}).join('')}
+ return items.map(function(i){return '<div class="task"><span class="jtodo"><span class="jbox'+(i.ok?' on':'')+'">'+(i.ok?'✓':'')+'</span><span class="'+(i.ok?'jdone':'')+'">'+esc(i.txt)+'</span></span><button class="mini '+(i.ok?'grey':'')+'" '+(i.ok?'disabled':'onclick="'+i.act+'"')+'>'+(i.ok?'已完成':'去完成')+'</button></div>'}).join('')}
 function moduleBarsHtml(){var done=moduleAttempted();var seen={};
  QBY().forEach(function(q){seen[q.module]=seen[q.module]||0;seen[q.module]++});
  return Object.keys(seen).map(function(m){var tot=seen[m],dn=done[m]||0,pct=tot?Math.round(dn/tot*100):0;
@@ -336,28 +573,70 @@ function checkIn(){ensureToday();var t=todayStr();
 function otaHomeLine(){var v=OTAMETA&&OTAMETA.version?('数据版本 v'+OTAMETA.version):'数据版本：内置基线';
  var s=OTAMETA&&OTAMETA.lastSync?(' · 同步于 '+fmtDT(OTAMETA.lastSync)):' · 未同步';
  return '<p class="small" style="margin:14px 16px 6px;cursor:pointer" onclick="go(\'mine\')">'+esc(v+s)+' · 学习数据只存在本机 ›</p>'}
-function vHome(){var el=document.getElementById('v-home');var st=stats();var days=gkCountdown();var cd=ST.checkin.last===todayStr();
- el.innerHTML=
- '<div class="hero"><span class="hbadge">行测真题 '+QBY().length.toLocaleString()+' 题 · 19 套卷 · 国考+省考职位检索</span>'
- +'<h1>先定岗，再刷题，<br><span class="hl">每一步都有数。</span></h1>'
- +'<p>选岗 · 题库 · 模考 · 公告。数据来自官方公开来源，进度只存在本机，无付费内容。</p>'
- +'<span class="date">'+todayCn()+(days!=null?(' · 距 2027 国考笔试 '+days+' 天'):'')+'</span></div>'
- +'<div class="kpis"><div class="kpi"><b>'+QBY().length.toLocaleString()+'</b><span>真题总数</span></div>'
- +'<div class="kpi"><b>'+st.uniq.toLocaleString()+'</b><span>已练题数</span></div>'
- +'<div class="kpi"><b>'+st.acc+'%</b><span>正确率</span></div></div>'
- +'<div class="card"><b>✅ 今日任务</b><span class="meta" style="margin-left:6px">'+todayCn()+'</span><div style="margin-top:6px">'+todayTasksHtml()+'</div></div>'
- +'<div class="card"><b>📢 招考公告</b><div style="margin-top:4px">'+homeNoticesHtml()+'</div>'
- +'<button class="btn ghost" style="margin-top:10px" onclick="pushNotices()">全部公告与地区订阅 →</button></div>'
- +'<div class="grid2">'
- +'<div class="gcard jade" onclick="go(\'choose\')"><b>🎯 智能选岗</b><span>画像 · 检索 · 历年进面分 · 收藏</span></div>'
- +'<div class="gcard teal2" onclick="go(\'bank\')"><b>📚 题库刷题</b><span>随机 · 模块 · 19 套卷 · 申论阅读</span></div>'
- +'<div class="gcard deep" onclick="go(\'mock\')"><b>⏱ 限时模考</b><span>135 / 130 / 120 题 · 120 分钟</span></div>'
- +'<div class="gcard" onclick="go(\'mine\')"><b>📊 学习数据</b><span>统计 · 收藏 · 数据同步 · 设置</span></div></div>'
- +'<div class="card"><b>🗓 每日打卡</b><div style="margin-top:10px"><button class="btn" id="ckBtn" onclick="checkIn()"'+(cd?' disabled':'')+'>'+(cd?'今日已打卡':'打卡 +1 天')+'</button></div>'
- +'<p class="small" style="margin-top:10px">已连续 <b>'+ST.checkin.streak+'</b> 天 · 累计 <b>'+ST.checkin.total+'</b> 天</p></div>'
- +'<div class="card"><b>📊 各模块进度</b><div style="margin-top:8px">'+moduleBarsHtml()+'</div></div>'
- +otaHomeLine();
- updateNoticeDot()}
+/* ---- 布局版：首页状态与共享组件 ---- */
+var LY_TRACK='gwy'; /* 公务员 | 选调 | 事业单位 */
+var TRACKS=[{k:'gwy',n:'公务员'},{k:'xd',n:'选调'},{k:'sy',n:'事业单位'}];
+function trackNotices(){var ns=noticeSorted();if(LY_TRACK==='gwy')return ns;return []} /* 本机公告数据（zhaokao.js，10 条）只有国考/国考补录/省考；选调、事业单位无本地公告 */
+function homeTrackHtml(){return '<div class="trk">'+TRACKS.map(function(t){return '<button class="'+(LY_TRACK===t.k?'on':'')+'" onclick="LY_TRACK=\''+t.k+'\';vHome()">'+t.n+'</button>'}).join('')+'</div>'}
+function gkDaysLeft(){var n=noticeSorted();for(var i=0;i<n.length;i++){var x=n[i];if(x.exam_type==='国考'&&x.exam_date){var d=new Date(x.exam_date+'T00:00:00+08:00');var t=new Date();var today=new Date(t.getFullYear(),t.getMonth(),t.getDate());return Math.round((d-today)/86400000)}}return null} /* 日历日差（考试日−今日）：现行版 gkCountdown() 用 ceil 到考试日 23:59:59，2026-11-12 会算出 18 天，与线框/任务要求的 17 天差 1；首页大卡改用日历日差，其他视图仍用原函数 */
+function festiveHtml(){var days=gkDaysLeft();var d=new Date();var w='日一二三四五六'[d.getDay()];
+ return '<div class="festive">'
+ +(days!=null?'<div class="fv-lab">距 2027 国考笔试</div><div class="fv-num">'+days+'<span> 天</span></div>':'')
+ +'<div class="fv-date">'+todayStr()+' · 星期'+w+' · 金榜题名时</div></div>'}
+/* v2 问候行（v0 做法）：暖纸底上的问候小字 + 大字标题，位于倒计时上方；文案取自 v0 原型，非竞品口号 */
+function greetHtml(){return '<div class="greet"><div class="greet-hi">早上好，备考人</div><div class="greet-big">今天也要稳稳上岸</div></div>'}
+/* 喜庆顶栏：首页顶部的朱红→橙金渐变 + 金色圆点纹理 + 52px 金色倒计时（纯 CSS；无考试日时只留日期小字，不编文案） */
+function heroHtml(){var ns=trackNotices();
+ var badge,sub;
+ if(LY_TRACK==='gwy'){var latest=ns[0];
+  if(latest){var y=(latest.title||'').indexOf('2027')>=0?' 2027':'';badge=esc(latest.region)+y+' 公告已发'}
+  else{badge='暂无公告'}
+  sub=(latest?esc(trunc(latest.title,18)):'招考公告汇总') /* 倒计时已移至首页顶部喜庆顶栏（festiveHtml），同一数值 */}
+ else{badge='本赛道暂无公告';sub='公告尚未收录到本机 · 去选岗查看职位'}
+ return '<div class="hero2">'
+ +'<div class="hero-big" onclick="go(\'choose\')"><span class="hb-tag">'+badge+'</span><div><b>选岗公告</b><span>'+sub+'</span></div><span class="hb-go">进入选岗 ›</span></div>'
+ +'<div class="hero-sm" onclick="go(\'choose\')"><b>🎯 智能选岗</b><span>按画像匹配职位</span></div>'
+ +'<div class="hero-sm" onclick="pushShizheng()"><b>📰 今日时政</b><span>当日要闻与练习</span></div></div>'}
+function toolGridHtml(isHome){var wc=wrongCount();var cmp=COMPARE.length;
+ var go2=function(x){return isHome?("bankTool('"+x+"')"):("bankOpen('"+x+"')")}; /* 首页进入先清筛选；题库页内进入保留考试/科目筛选 */
+ var cells=[
+ {i:'📄',n:'历年真题',s:'19 套真题卷',fn:go2('paper')},
+ {i:'🧠',n:'智能组卷',s:'按配额组卷',fn:go2('smart')},
+ {i:'🎲',n:'随机刷题',s:'随机 10 题',fn:go2('rand')},
+ {i:'⏱️',n:'限时练习',s:'限时模考',fn:"go('mock')"},
+ {i:'❌',n:'错题重做',s:wc+' 道待重做',fn:go2('wrong')},
+ {i:'🗂️',n:'考点总览',s:'6 模块 · 2,445 题次',fn:go2('kaodian')}];
+ if(isHome){cells.push(
+ {i:'⚖️',n:'选岗对比',s:cmp?('对比篮 '+cmp+' 个'):'对比篮为空',fn:"compareOpen()"},
+ {i:'📝',n:'模拟考试',s:'2025 结构',fn:"go('mock')"});}
+ return '<div class="tgrid'+(isHome?'':' three')+'">'+cells.map(function(c){return '<div class="tcell" onclick="'+c.fn+'"><div class="ti">'+c.i+'</div><b>'+c.n+'</b><span>'+c.s+'</span></div>'}).join('')+'</div>'}
+function duoHtml(){return '<div class="duo2">'
+ +'<div class="duo" onclick="pushShizheng()"><b>📰 时政日报</b><span>当日要闻 + 常识与申论练习</span><span class="go">每日更新 ›</span></div>'
+ +'<div class="duo" onclick="bankTool(\'vocab\')"><b>📖 成语与近义词手册</b><span>高频成语 186 · 近义词 45 组</span><span class="go">打开手册 ›</span></div></div>'}
+function weekHtml(){var now=new Date();var dow=(now.getDay()+6)%7; /* 周一=0 */
+ var labels=['一','二','三','四','五','六','日'];var days=[];
+ for(var i=0;i<7;i++){var d=new Date(now);d.setDate(now.getDate()-dow+i);days.push(todayStr(d))}
+ var set={};(ST.checkin.dates||[]).forEach(function(x){set[x]=1});
+ var cnt=days.filter(function(x){return set[x]}).length;
+ return '<div class="wk">'+days.map(function(x,i){return '<div class="wkday'+(set[x]?' on':'')+'">周'+labels[i]+'<i>'+(set[x]?'✓':'')+'</i></div>'}).join('')+'</div>'
+ +'<p class="meta" style="margin:10px 0 0">本周已打卡 '+cnt+' 天</p>'}
+function scoreCardHtml(){var st=stats();var cd=ST.checkin.last===todayStr();
+ return '<div class="score"><div class="srow"><b>我的进度</b><button class="mini" onclick="checkIn()"'+(cd?' disabled':'')+'>'+(cd?'今日已打卡':'打卡')+'</button></div>'
+ +'<div class="kpis" style="margin:12px 0 0"><div class="kpi"><b>'+st.uniq+'</b><span>已练题数</span></div><div class="kpi"><b>'+(st.n?st.acc+'%':'—')+'</b><span>正确率</span></div><div class="kpi"><b>'+ST.checkin.streak+' 天</b><span>连续打卡</span></div></div>'
+ +weekHtml()+'</div>'}
+function homeNoticeHtml(){var ns=trackNotices();
+ if(LY_TRACK!=='gwy')return '<div class="ntc" onclick="go(\'choose\')"><span class="nt">本赛道暂无公告 · 去选岗查看职位</span><span class="tag2">选岗 ›</span></div>';
+ var n=ns[0];if(!n)return '';
+ return '<div class="ntc" onclick="pushNotices()"><span class="nt">📢 '+esc(n.title)+'</span><span class="tag2">'+esc(n.publish_date||'')+'</span></div>'}
+function bankTool(sub){BANKEXAM=null;BANKSUBJ=null;go('bank');bankOpen(sub)} /* bankOpen 本身只渲染 #v-bank、不切 tab（现行版亦然，其入口都在题库页内）；新首页的格子须先切到题库页再进对应功能，否则渲染在隐藏视图里 */
+function vHome(){var el=document.getElementById('v-home');
+ el.innerHTML=greetHtml()+festiveHtml()+homeTrackHtml()+heroHtml()
+ +'<div class="sect"><h2>刷题工具</h2></div>'+toolGridHtml(true)
+ +'<div class="sect"><h2>内容</h2></div>'+duoHtml()
+ +'<div class="sect"><h2>我的进度</h2></div>'+scoreCardHtml()
+ +homeNoticeHtml()
+ +otaHomeLine()}
+
 function updateNoticeDot(){var d=$('#noticeDot');if(!d)return;var any=noticeSorted().some(isFresh);d.hidden=!any}
 
 /* ================= 9. 选岗 ================= */
@@ -603,34 +882,66 @@ var PACKS={},WPACKS={};
 function vBank(){var el=document.getElementById('v-bank');PACKS={};
  if(!BANKSUB){el.innerHTML=bankMenuHtml();return}
  if(BANKSUB==='mod')renderBankMod();else if(BANKSUB==='paper')renderBankPaper();
+ else if(BANKSUB==='rand')startRand(10);else if(BANKSUB==='smart')startSmart(10);
  else if(BANKSUB==='wrong')renderBankWrong();else if(BANKSUB==='favq')renderBankFavQ();
  else if(BANKSUB==='shenlun')renderBankShenlun();else if(BANKSUB==='kaodian')renderKaodian();
  else if(BANKSUB==='vocab')renderVocab();else{BANKSUB=null;el.innerHTML=bankMenuHtml()}}
 function bankOpen(sub){BANKSUB=sub||null;if(sub)BANKMOD={module:null,sub:null};vBank();window.scrollTo(0,0)}
+/* ---- 布局版：题库页筛选与任务树 ---- */
+var BANKEXAM=null; /* null=全部 | 'gk' 国考 | 'sk' 省考（本机真题为重庆市考卷） | 'xd' 选调（笔试共用行测题库） */
+var BANKSUBJ=null; /* 模块全名 | null */
+var LY_OPEN={'言语理解与表达':true,'判断推理':true}; /* 默认展开言语、判断 */
+var BANKEXAMS=[{k:'gk',n:'国考'},{k:'sk',n:'省考'},{k:'xd',n:'选调'}];
+var BANKSUBJS=[{k:'言语理解与表达',n:'言语'},{k:'判断推理',n:'判断'},{k:'数量关系',n:'数量'},{k:'资料分析',n:'资料'},{k:'常识判断',n:'常识'},{k:'政治理论',n:'政治'}];
+function bankPool(){if(!BANKEXAM)return QBY();if(BANKEXAM==='gk')return QBY().filter(function(q){return q.exam==='国考'});if(BANKEXAM==='sk')return QBY().filter(function(q){return q.exam==='重庆市考'});return QBY()} /* 选调：笔试共用行测题库，出题范围为全部真题 */
+function bankPapers(){var ps=PAPERS().slice().sort(function(a,b){return (b.year-a.year)||(a.level<b.level?-1:1)});if(!BANKEXAM)return ps;if(BANKEXAM==='gk')return ps.filter(function(p){return p.exam==='国考'});if(BANKEXAM==='sk')return ps.filter(function(p){return p.exam==='重庆市考'});return ps} /* 选调无单独卷，显示全部 */
+function setBankExam(k){BANKEXAM=(BANKEXAM===k)?null:k;vBank()}
+function setBankSubj(k){BANKSUBJ=(BANKSUBJ===k)?null:k;vBank()}
+function bankFilterHtml(){var h='<div class="filt"><div class="flbl">考试</div><div class="chips">'
+ +BANKEXAMS.map(function(x){return '<button class="chip'+(BANKEXAM===x.k?' on':'')+'" onclick="setBankExam(\''+x.k+'\')">'+x.n+'</button>'}).join('')+'</div>'
+ +'<div class="flbl">科目</div><div class="chips">'
+ +BANKSUBJS.map(function(x){return '<button class="chip'+(BANKSUBJ===x.k?' on':'')+'" onclick="setBankSubj(\''+x.k+'\')">'+x.n+'</button>'}).join('')+'</div>';
+ if(BANKEXAM==='xd')h+='<p class="meta" style="margin:8px 0 0">选调笔试共用行测题库，出题范围为全部真题；选调暂无单独真题卷。</p>';
+ if(BANKEXAM==='sk')h+='<p class="meta" style="margin:8px 0 0">省考：本机真题为重庆市考卷。</p>';
+ return h+'</div>'}
+function shortModule(m){return{'言语理解与表达':'言语理解','判断推理':'判断推理','资料分析':'资料分析','常识判断':'常识判断','数量关系':'数量关系','政治理论':'政治理论'}[m]||m}
+function subAttempted(){var o={};for(var id in ST.attempts){var q=qById(id);if(!q)continue;var m=o[q.module]=o[q.module]||{};m[q.subType]=(m[q.subType]||0)+1}return o}
+function renderBankTree(){var kd=KAODIAN();var mods=(kd&&kd.modules)||[];
+ var sa=subAttempted();var ma=moduleAttempted();
+ var uniqSub={},uniqMod={};QBY().forEach(function(q){var k=q.module+'|'+q.subType;uniqSub[k]=(uniqSub[k]||0)+1;uniqMod[q.module]=(uniqMod[q.module]||0)+1}); /* 岸印口径：唯一题数（题次含跨卷重复） */
+ if(!mods.length)mods=TREE().map(function(m){return{module:m.module,slots:m.subtypes.reduce(function(a,s){return a+s.slots},0),subtypes:m.subtypes.map(function(s){return{name:s.name,slots:s.slots,pct_in_module:null}})}});
+ var list=BANKSUBJ?mods.filter(function(m){return m.module===BANKSUBJ}):mods;
+ return '<div class="tree">'+list.map(function(m){
+  var dn=ma[m.module]||0;var tot=m.slots||0;var pct=tot?Math.min(100,Math.round(dn/tot*100)):0;
+  var open=!!LY_OPEN[m.module]||!!BANKSUBJ;
+  var kids=open?'<div class="kids">'+m.subtypes.map(function(s){
+    var sd=(sa[m.module]&&sa[m.module][s.name])||0;var stot=s.slots||0;var sp=stot?Math.min(100,Math.round(sd/stot*100)):0;
+    var doneKid=sd>0&&sd>=(uniqSub[m.module+'|'+s.name]||0); /* 岸印：本题型唯一真题全部练完 */
+    return '<div class="kid'+(doneKid?' done':'')+'" onclick="startTreePractice(\''+esc(m.module)+'\',\''+esc(s.name)+'\')"><div class="krow"><div class="kn"><b>'+esc(s.name)+'</b>'+(s.pct_in_module!=null?'<span>占模块 '+s.pct_in_module+'%</span>':'')+'</div><div class="kc">'+sd+' / '+stot+'</div></div><div class="kbar"><i style="width:'+sp+'%"></i></div></div>'}).join('')+'</div>':'';
+  var doneMod=dn>0&&dn>=(uniqMod[m.module]||0); /* 岸印：本模块唯一真题全部练完 */
+  return '<div class="node'+(doneMod?' done':'')+'"><div class="nhead" onclick="toggleTree(\''+esc(m.module)+'\')"><div class="nm"><b>'+esc(shortModule(m.module))+'</b><span>'+m.subtypes.length+' 类题型 · 共 '+tot+' 题次</span></div><div class="nc">'+dn+' / '+tot+'</div><span class="chev">'+(open?'▾':'▸')+'</span></div><div class="nbar"><i style="width:'+pct+'%"></i></div>'+kids+'</div>'}).join('')+'</div>'}
+function toggleTree(m){if(BANKSUBJ===m)BANKSUBJ=null;LY_OPEN[m]=!LY_OPEN[m];vBank()}
+function startTreePractice(m,s){BANKMOD={module:m,sub:s};startMod(10)}
 function bankMenuHtml(){var st=stats();
  var resume=ST.active?'<div class="resume"><span>📝 有未完成的练习：'+esc(ST.active.title)+'</span><button class="mini" onclick="resumePractice()">继续</button></div>':'';
  var resumeM=ST.mockActive?'<div class="resume"><span>⏱ 有进行中的模考，剩余 '+esc(fmtMS(ST.mockActive.end-Date.now()))+'</span><button class="mini" onclick="go(\'mock\');mockResume()">去模考</button></div>':'';
- var recent=ST.hist.slice(0,3).map(function(h){return '<div class="subrow" style="cursor:default"><span style="flex:1;min-width:0">'+esc(trunc(h.title,20))+'<br><span class="dash">'+esc(fmtDT(h.t))+' · '+h.ok+'/'+h.n+' · 正确率 '+(h.n?Math.round(h.ok/h.n*100):0)+'%</span></span></div>'}).join('');
- return '<div class="sect"><h2>📚 题库</h2><span class="rt">已练 '+st.uniq+' 题 · 正确率 '+st.acc+'%</span></div>'
+ return '<div class="sect"><h2>📚 题库</h2><span class="rt">已练 '+st.uniq+' 题 · 正确率 '+(st.n?st.acc+'%':'—')+'</span></div>'
  +resume+resumeM
- +'<div class="grid2">'
- +'<div class="gcard jade" onclick="bankOpen(\'rand\')"><b>🎲 随机刷题</b><span>从 1,747 道真题中随机抽取</span></div>'
- +'<div class="gcard teal2" onclick="bankOpen(\'mod\')"><b>🧩 按模块刷题</b><span>6 大模块 · 26 类题型</span></div>'
- +'<div class="gcard" onclick="bankOpen(\'paper\')"><b>📄 按卷练习</b><span>国考+重庆市考 19 套真题卷</span></div>'
- +'<div class="gcard deep" onclick="bankOpen(\'smart\')"><b>🤖 智能组卷</b><span>按考点配额 · 弱项加权</span></div>'
- +'<div class="gcard jade" onclick="bankOpen(\'wrong\')"><b>📕 错题本</b><span id="wrongCnt">'+wrongCount()+' 题待重做 · 按知识点/时间</span></div>'
- +'<div class="gcard" onclick="bankOpen(\'favq\')"><b>⭐ 题目收藏</b><span>'+ST.fav.length+' 道已收藏</span></div>'
- +'<div class="gcard teal2" onclick="bankOpen(\'shenlun\')"><b>📜 申论真题</b><span>28 卷 · 只读阅读（无批改）</span></div>'
- +'<div class="gcard jade" onclick="bankOpen(\'kaodian\')"><b>🗺 考点总览</b><span>2021–2025 真题频次实测</span></div>'
- +'<div class="gcard" onclick="bankOpen(\'vocab\')"><b>📖 成语 · 近义词</b><span>高频成语 186 · 近义词 45 组</span></div>'
- +'</div>'
- +(recent?'<div class="card"><b>🕘 最近练习</b><div style="margin-top:4px">'+recent+'</div></div>':'')
+ +bankFilterHtml()
+ +'<div class="sect"><h2>刷题工具</h2></div>'+toolGridHtml(false)
+ +'<div class="card" style="padding:8px 16px">'
+ +'<div class="subrow" onclick="bankOpen(\'shenlun\')"><span style="flex:1">📜 申论真题（28 卷 · 只读）</span><span>›</span></div>'
+ +'<div class="subrow" onclick="bankOpen(\'favq\')"><span style="flex:1">⭐ 题目收藏（'+ST.fav.length+' 道）</span><span>›</span></div></div>'
+ +'<div class="sect"><h2>我的进度</h2></div>'+scoreCardHtml()
+ +'<div class="sect"><h2>考点任务树</h2><span class="rt">2021–2025 · 题次</span></div>'
+ +renderBankTree()
  +'<div class="card note"><p class="meta">题目为 2021–2025 国考与重庆市考真题整理，解析为本题库自有内容（版权复核进行中）。刷题数据只存在本机。</p></div>'}
+
 function packFor(ids,title,opts){var k='p'+(Math.random().toString(36).slice(2,8));
  PACKS[k]={ids:ids,title:title,mode:(opts&&opts.mode)||'practice',redowrong:!!(opts&&opts.redowrong)};
  return 'startPack(\''+k+'\')'}
 function startPack(k){var p=PACKS[k];if(!p)return;startPractice(p)}
-function startRand(n){var ids=sampleN(QBY(),n).map(function(q){return q.id});startPractice({ids:ids,title:'随机练习 '+n+' 题'})}
+function startRand(n){var ids=sampleN(bankPool(),n).map(function(q){return q.id});startPractice({ids:ids,title:'随机练习 '+n+' 题'})}
 function startSmart(n){var ids=smartBuild(n);if(!ids.length){toast('组卷失败，请重试');return}
  startPractice({ids:ids,title:'智能组卷 '+Math.min(n,ids.length)+' 题'})}
 /* --- 按模块 --- */
@@ -652,19 +963,20 @@ function renderBankMod(){var el=document.getElementById('v-bank');
  +'<button class="btn ghost" style="margin-bottom:8px" onclick="startMod(20)">练 20 题</button>'
  +'<button class="btn ghost" onclick="startMod(0)">本'+(BANKMOD.sub?'题型':'模块')+'全部 '+pool.length+' 题</button>'
  +'<p class="meta" style="margin-top:8px">作答即判分，答错自动进错题本。</p></div></div>'}
-function startMod(n){var pool=QBY().filter(function(q){return q.module===BANKMOD.module&&(!BANKMOD.sub||q.subType===BANKMOD.sub)});
+function startMod(n){var pool=bankPool().filter(function(q){return q.module===BANKMOD.module&&(!BANKMOD.sub||q.subType===BANKMOD.sub)});
  if(!pool.length){toast('该范围内暂无题目');return}
  var ids=(n?sampleN(pool,Math.min(n,pool.length)):shuffle(pool)).map(function(q){return q.id});
  startPractice({ids:ids,title:BANKMOD.module+(BANKMOD.sub?(' · '+BANKMOD.sub):'')})}
 /* --- 按卷 --- */
 function paperDone(p){var a=ST.attempts,n=0;p.questionIds.forEach(function(id){if(a[id])n++});return n}
 function renderBankPaper(){var el=document.getElementById('v-bank');
- var ps=PAPERS().slice().sort(function(a,b){return (b.year-a.year)||(a.level<b.level?-1:1)});
+ var ps=bankPapers();
  el.innerHTML='<div class="sect"><h2>📄 按卷练习</h2><button class="mini grey" onclick="bankOpen(null)">‹ 返回题库</button></div>'
+ +(BANKEXAM==='xd'?'<p class="meta" style="margin:10px 16px 0">选调暂无单独真题卷；选调笔试共用行测题库，以下为全部真题卷。</p>':'')
  +'<div class="card" style="padding:8px 16px">'+ps.map(function(p,i){var dn=paperDone(p);
   return '<div class="subrow" onclick="startPaper('+i+')"><span style="flex:1"><b>'+esc(paperName(p))+'</b><br><span class="dash">'+p.questionIds.length+' 题 · 已练 '+dn+'</span></span><span>›</span></div>'}).join('')+'</div>'
  +'<p class="small" style="margin:10px 16px">按真题卷顺序做题，进度自动保存，可离线使用。</p>'}
-function startPaper(i){var ps=PAPERS().slice().sort(function(a,b){return (b.year-a.year)||(a.level<b.level?-1:1)});
+function startPaper(i){var ps=bankPapers();
  var p=ps[i];if(!p)return;startPractice({ids:p.questionIds.slice(),title:paperName(p),mode:'paper'})}
 /* --- 智能组卷 --- */
 function weakModules(){var per={};QBY().forEach(function(q){per[q.module]=per[q.module]||{n:0,c:0}});
@@ -672,7 +984,7 @@ function weakModules(){var per={};QBY().forEach(function(q){per[q.module]=per[q.
  return Object.keys(per).filter(function(m){var p=per[m];return p.n>=8&&p.c/p.n<0.7})
   .sort(function(x,y){return (per[x].c/per[x].n)-(per[y].c/per[y].n)}).slice(0,2)}
 function smartBuild(total){var quota=QUOTA()['国考副省级（135 题）']||{};var mods=Object.keys(quota);
- if(!mods.length)return sampleN(QBY(),total).map(function(q){return q.id});
+ if(!mods.length)return sampleN(bankPool(),total).map(function(q){return q.id});
  var sum=0;mods.forEach(function(m){sum+=quota[m]});if(!sum)sum=135;
  var weak=weakModules();var w={},sw=0;
  mods.forEach(function(m){w[m]=(weak.indexOf(m)>=0?1.3:1)*quota[m];sw+=w[m]});
@@ -681,11 +993,11 @@ function smartBuild(total){var quota=QUOTA()['国考副省级（135 题）']||{}
  alloc.sort(function(a,b){return (b.r%1)-(a.r%1)});
  var i=0;while(used<total&&alloc.length){alloc[i%alloc.length].f++;used++;i++}
  var chosen={},out=[];
- alloc.forEach(function(x){var pool=QBY().filter(function(q){return q.module===x.m&&!chosen[q.id]});
+ alloc.forEach(function(x){var pool=bankPool().filter(function(q){return q.module===x.m&&!chosen[q.id]});
   var fresh=pool.filter(function(q){return !ST.attempts[q.id]||ST.wrong[q.id]});
   var pick=sampleN(fresh,x.f);if(pick.length<x.f){var rest=pool.filter(function(q){return fresh.indexOf(q)<0});pick=pick.concat(sampleN(rest,x.f-pick.length))}
   pick.forEach(function(q){chosen[q.id]=1;out.push(q.id)})});
- if(out.length<total){var rest=QBY().filter(function(q){return !chosen[q.id]});out=out.concat(sampleN(rest,total-out.length).map(function(q){return q.id}))}
+ if(out.length<total){var rest=bankPool().filter(function(q){return !chosen[q.id]});out=out.concat(sampleN(rest,total-out.length).map(function(q){return q.id}))}
  return out.slice(0,total)}
 /* --- 错题本（双维度） --- */
 function renderBankWrong(){var el=document.getElementById('v-bank');
@@ -782,7 +1094,7 @@ function mockBuildIds(quota){var out=[],chosen={};
   var fresh=pool.filter(function(q){return !ST.attempts[q.id]});
   var pick=sampleN(fresh,quota[m]);if(pick.length<quota[m]){var rest=pool.filter(function(q){return fresh.indexOf(q)<0});pick=pick.concat(sampleN(rest,quota[m]-pick.length))}
   pick.forEach(function(q){chosen[q.id]=1;out.push(q.id)})});
- if(out.length<quotaTotal(quota)){var rest=QBY().filter(function(q){return !chosen[q.id]});out=out.concat(sampleN(rest,quotaTotal(quota)-out.length).map(function(q){return q.id}))}
+ if(out.length<quotaTotal(quota)){var rest=bankPool().filter(function(q){return !chosen[q.id]});out=out.concat(sampleN(rest,quotaTotal(quota)-out.length).map(function(q){return q.id}))}
  return out}
 function vMock(){var el=document.getElementById('v-mock');
  var resume=ST.mockActive?'<div class="resume"><span>⏱ 模考进行中 · 剩余 '+esc(fmtMS(ST.mockActive.end-Date.now()))+'</span><button class="mini" onclick="mockResume()">继续</button></div>':'';
@@ -1042,7 +1354,7 @@ function vMine(){var el=document.getElementById('v-mine');var st=stats();var cd=
  '<div class="sect"><h2>👤 我的</h2><span class="rt">'+esc(APP_NAME)+' v'+APP_VER+'</span></div>'
  +'<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><b>🗓 每日打卡</b><br><span class="meta">连续 '+ST.checkin.streak+' 天 · 累计 '+ST.checkin.total+' 天'+(ST.checkin.last?(' · 最近 '+esc(ST.checkin.last)):'' )+'</span></div>'
  +'<button class="mini" style="flex-shrink:0" onclick="checkIn()"'+(cd?' disabled':'')+'>'+(cd?'今日已打卡':'打卡')+'</button></div>'
- +'<div class="kpis"><div class="kpi"><b>'+st.uniq+'</b><span>已练题数</span></div><div class="kpi"><b>'+st.acc+'%</b><span>正确率</span></div><div class="kpi"><b>'+wrongCount()+'</b><span>错题待重做</span></div>'
+ +'<div class="kpis"><div class="kpi"><b>'+st.uniq+'</b><span>已练题数</span></div><div class="kpi"><b>'+(st.n?st.acc+'%':'—')+'</b><span>正确率</span></div><div class="kpi"><b>'+wrongCount()+'</b><span>错题待重做</span></div>'
  +'<div class="kpi"><b>'+ST.fav.length+'</b><span>收藏题目</span></div><div class="kpi"><b>'+ST.mocks.length+'</b><span>模考次数</span></div><div class="kpi"><b>'+FAVPOS.length+'</b><span>收藏职位</span></div></div>'
  +'<div class="card"><b>⭐ 我的收藏</b>'
  +'<div class="subrow" onclick="bankOpen(\'favq\')"><span style="flex:1">收藏的题目（'+ST.fav.length+'）</span><span>›</span></div>'
@@ -1070,6 +1382,25 @@ function otaKindsHtml(){var k=(OTAMETA&&OTAMETA.kinds)||{};var lines=[];
  Object.keys(k).forEach(function(x){lines.push('· '+esc(names[x]||x)+' '+(k[x].count!=null?k[x].count+' 条':'')+' ✓')});
  if(!lines.length)lines.push('· 内置基线：题 1,747 · 卷 19 · 材料 94 · 申论 28 卷 · 公告 '+(ZHAOKAO().notices||[]).length+' 条');
  return lines.join('<br>')}
+/* ---- 布局版：时政日报（读 OTA 同步的 window.QB_SHIZHENG；未同步时诚实提示，不做假入口） ---- */
+function pushShizheng(){pushOvl(renderShizheng,null)}
+function shizhengIssues(){var S=window.QB_SHIZHENG;if(!S)return null;
+ if(Array.isArray(S))return S;
+ if(S&&Array.isArray(S.issues))return S.issues;
+ if(S&&Array.isArray(S.days))return S.days;
+ if(S&&Array.isArray(S.data))return S.data;
+ return{raw:true}}
+function renderShizheng(){setHead('时政日报');var el=ovlBodyEl;var iss=shizhengIssues();
+ if(!iss){el.innerHTML='<div class="card"><b>📰 时政日报尚未同步到本机</b><p class="meta" style="margin:8px 0;line-height:1.8">本机内置基线不含时政内容。时政日报由服务端每日更新，需联网同步后查看。</p><button class="btn" onclick="popOvl();go(\'mine\')">去「我的」检查更新</button></div>';return}
+ if(iss.raw){el.innerHTML='<div class="card"><b>📰 时政日报</b><p class="meta" style="margin:8px 0">已同步的时政数据格式暂不支持展示，请检查更新后重试。</p></div>';return}
+ if(!iss.length){el.innerHTML='<div class="card"><b>📰 时政日报</b><p class="meta">暂无内容。</p></div>';return}
+ el.innerHTML='<div class="sect"><h2>📰 时政日报</h2><span class="rt">'+iss.length+' 期</span></div>'
+ +iss.slice(0,7).map(function(it){var head=it.date||it.period||'';
+  if(it.title)head=head?(head+' · '+it.title):it.title;
+  var items=it.items||it.news||it.list||[];
+  var rows=Array.isArray(items)?items.slice(0,10).map(function(x){var t=typeof x==='string'?x:(x.title||x.name||'');return t?'<li>'+esc(t)+'</li>':''}).join(''):'';
+  return '<div class="card"><b>'+esc(head||'时政')+'</b>'+(rows?'<ul class="tl" style="margin-top:10px">'+rows+'</ul>':'')+'</div>'}).join('')}
+
 function pushAbout(){pushOvl(function(){setHead('关于');
  ovlBodyEl.innerHTML='<div class="card"><b>关于 '+esc(APP_NAME)+'</b><p class="meta" style="margin:8px 0;line-height:2">版本 v'+APP_VER+'（独立新应用，非任何既有品牌）<br>功能结构参照公开静态分析报告按机制重建；界面、文案、配色均为本项目原创。</p></div>'
  +'<div class="card"><b>📚 数据来源（仅官方）</b><p class="meta" style="margin:8px 0;line-height:2">· 招考公告与职位表：国家公务员局、各省人事考试网/组织部门官网<br>· 历年进面分：国家公务员局面试名单（2024–2026 国考，58,711 条）<br>· 真题：2021–2025 国考与重庆市考行测 19 套 1,747 题、申论 28 卷 126 题（自有整理，版权复核进行中）<br>· 考点频次与成语词频：基于上述真题库自有统计</p></div>'
