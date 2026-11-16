@@ -612,6 +612,7 @@ function toolGridHtml(isHome){var wc=wrongCount();var cmp=COMPARE.length;
  return '<div class="tgrid'+(isHome?'':' three')+'">'+cells.map(function(c){return '<div class="tcell" onclick="'+c.fn+'"><div class="ti">'+c.i+'</div><b>'+c.n+'</b><span>'+c.s+'</span></div>'}).join('')+'</div>'}
 function duoHtml(){return '<div class="duo2">'
  +'<div class="duo" onclick="pushShizheng()"><b>📰 时政日报</b><span>当日要闻 + 常识与申论练习</span><span class="go">每日更新 ›</span></div>'
+ +reciteCardHtml()
  +'<div class="duo" onclick="bankTool(\'vocab\')"><b>📖 成语与近义词手册</b><span>高频成语 186 · 近义词 45 组</span><span class="go">打开手册 ›</span></div></div>'}
 function weekHtml(){var now=new Date();var dow=(now.getDay()+6)%7; /* 周一=0 */
  var labels=['一','二','三','四','五','六','日'];var days=[];
@@ -1386,6 +1387,7 @@ function otaKindsHtml(){var k=(OTAMETA&&OTAMETA.kinds)||{};var lines=[];
 function pushShizheng(){pushOvl(renderShizheng,null)}
 function shizhengIssues(){var S=window.QB_SHIZHENG;if(!S)return null;
  if(Array.isArray(S))return S;
+ if(S&&Array.isArray(S.reports))return S.reports;
  if(S&&Array.isArray(S.issues))return S.issues;
  if(S&&Array.isArray(S.days))return S.days;
  if(S&&Array.isArray(S.data))return S.data;
@@ -1399,7 +1401,47 @@ function renderShizheng(){setHead('时政日报');var el=ovlBodyEl;var iss=shizh
   if(it.title)head=head?(head+' · '+it.title):it.title;
   var items=it.items||it.news||it.list||[];
   var rows=Array.isArray(items)?items.slice(0,10).map(function(x){var t=typeof x==='string'?x:(x.title||x.name||'');return t?'<li>'+esc(t)+'</li>':''}).join(''):'';
-  return '<div class="card"><b>'+esc(head||'时政')+'</b>'+(rows?'<ul class="tl" style="margin-top:10px">'+rows+'</ul>':'')+'</div>'}).join('')}
+  var cz=it.cloze||[];
+  var rec=cz.length?'<p style="margin:10px 0 0"><button class="btn" onclick="pushCloze(\''+esc(it.date||'')+'\')">📖 背诵模式（'+cz.length+' 条）</button></p>':'';
+  return '<div class="card"><b>'+esc(head||'时政')+'</b>'+(rows?'<ul class="tl" style="margin-top:10px">'+rows+'</ul>':'')+rec+'</div>'}).join('')}
+
+/* ---- 背诵填空 v1：卡片式遮盖自测，进度只存本机（localStorage sy_cloze） ---- */
+var CLOZE_KEY='sy_cloze';
+var CLOZE_TYPES={number:'数字',date:'日期',docno:'文号',person:'人名',place:'地名',term:'政策原词'};
+function clozeStore(){return lsGet(CLOZE_KEY,{})}
+function clozeSave(m){lsSet(CLOZE_KEY,m)}
+function clozeOf(date){var iss=shizhengIssues();if(!iss||iss.raw)return[];
+ var it=null;for(var i=0;i<iss.length;i++){if(iss[i].date===date){it=iss[i];break}}
+ return it?(it.cloze||[]):[]}
+function latestClozeDate(){var iss=shizhengIssues();if(!iss||iss.raw)return null;
+ var best=null;for(var i=0;i<iss.length;i++){var c=iss[i].cloze||[];
+  if(c.length&&(!best||iss[i].date>best))best=iss[i].date}return best}
+function clozeCount(date){var m=clozeStore();var items=clozeOf(date);var known=0;
+ items.forEach(function(c){if(m[c.id]&&m[c.id].s==='known')known++});
+ return{total:items.length,known:known}}
+function pushCloze(date){pushOvl(function(){renderCloze(date)},null)}
+function renderCloze(date){setHead('背诵填空 · '+date);var el=ovlBodyEl;
+ var items=clozeOf(date);
+ if(!items.length){el.innerHTML='<div class="card"><b>本期暂无背诵条目</b><p class="meta" style="margin:8px 0">该期时政日报尚未生成关键词填空，请先同步最新数据。</p><button class="btn ghost" onclick="popOvl()">返回</button></div>';return}
+ var m=clozeStore();
+ var todo=items.filter(function(c){return!(m[c.id]&&m[c.id].s==='known')});
+ var done=items.length-todo.length;
+ if(!todo.length){el.innerHTML='<div class="card"><b>🎉 本期 '+items.length+' 条全部掌握</b><p class="meta" style="margin:8px 0">已背 '+items.length+' / '+items.length+'，可以去背下一期，或点下方重练。</p><p><button class="btn" onclick="clozeReset(\''+esc(date)+'\')">重练本期</button> <button class="btn ghost" onclick="popOvl()">返回</button></p></div>';return}
+ var c=todo[0];var idx=items.indexOf(c)+1;
+ var hint=c.hint?'<p class="meta" style="margin:8px 0">提示：'+esc(c.hint)+'</p>':'';
+ el.innerHTML='<div class="card"><p class="meta">第 '+idx+' / '+items.length+' 条 · 已掌握 '+done+' 条 · 待复习 '+todo.length+' 条</p>'
+ +'<p style="margin:6px 0"><span class="tag">'+esc(CLOZE_TYPES[c.type]||c.type||'关键词')+'</span> <span class="meta">'+esc(c.source||'')+'</span></p>'
+ +'<p style="font-size:17px;line-height:1.9;margin:12px 0">'+esc(c.sentence).replace(/___/g,'<span style="color:var(--jaded);font-weight:700">___</span>')+'</p>'
+ +hint
+ +'<div id="clozeAns" style="display:none"><p style="margin:10px 0">答案：<b style="color:var(--jaded);font-size:17px">'+esc(c.keyword)+'</b></p>'
+ +'<p><button class="btn" onclick="clozeMark(\''+esc(date)+'\',\''+esc(c.id)+'\',\'known\')">记得 ✓</button> <button class="btn ghost" onclick="clozeMark(\''+esc(date)+'\',\''+esc(c.id)+'\',\'forgot\')">忘了 ✗</button></p></div>'
+ +'<p id="clozeRev"><button class="btn" onclick="document.getElementById(\'clozeAns\').style.display=\'block\';document.getElementById(\'clozeRev\').style.display=\'none\'">揭示答案</button></p>'
+ +'<p><button class="btn ghost" onclick="popOvl()">返回日报</button></p></div>'}
+function clozeMark(date,id,s){var m=clozeStore();m[id]={s:s,ts:Date.now()};clozeSave(m);rerenderOvl(true)}
+function clozeReset(date){var m=clozeStore();clozeOf(date).forEach(function(c){delete m[c.id]});clozeSave(m);rerenderOvl(true)}
+function reciteCardHtml(){var d=latestClozeDate();if(!d)return '';
+ var cc=clozeCount(d);
+ return '<div class="duo" onclick="pushCloze(\''+esc(d)+'\')"><b>📖 每日背诵</b><span>'+esc(d)+' · '+cc.total+' 条，已背 '+cc.known+' 条</span><span class="go">开始背诵 ›</span></div>'}
 
 function pushAbout(){pushOvl(function(){setHead('关于');
  ovlBodyEl.innerHTML='<div class="card"><b>关于 '+esc(APP_NAME)+'</b><p class="meta" style="margin:8px 0;line-height:2">版本 v'+APP_VER+'（独立新应用，非任何既有品牌）<br>功能结构参照公开静态分析报告按机制重建；界面、文案、配色均为本项目原创。</p></div>'
